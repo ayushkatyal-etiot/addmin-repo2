@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-typecheck-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version is intentionally omitted here: pnpm/action-setup reads it
+      # from the "packageManager" field in package.json. Setting an explicit
+      # `version` input here as well causes ERR_PNPM_BAD_PM_VERSION when the
+      # two disagree, so package.json's packageManager is the single source
+      # of truth for the pnpm version.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @addmin/db run generate
+        env:
+          # A placeholder DATABASE_URL is enough for `prisma generate` (it only
+          # reads the schema, no DB connection needed). Real staging/production
+          # secrets are never required for this job, so it also passes on
+          # fork PRs with no access to repository secrets.
+          DATABASE_URL: postgresql://user:password@localhost:5432/addmin_ci
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/addmin_ci
+
+      - name: Test
+        run: pnpm run test

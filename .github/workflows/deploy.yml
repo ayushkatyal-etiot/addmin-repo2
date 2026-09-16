@@ -1,0 +1,59 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+
+# Staging deploys automatically on every merge to main, per Build Step 01's
+# acceptance rubric in planmysaas-blueprint/08-build-playbook.md. Production
+# deploys (Build Step 12) are a separate, manually-approved workflow — this
+# one must never be reused for production.
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version is intentionally omitted here: pnpm/action-setup reads it
+      # from the "packageManager" field in package.json (kept as the single
+      # source of truth to avoid ERR_PNPM_BAD_PM_VERSION mismatches).
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @addmin/db run generate
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+      - name: Build
+        run: pnpm run build
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+      - name: Apply pending migrations
+        run: pnpm --filter @addmin/db exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+      # Deploy step is provider-specific (AWS or Render, per 04-architecture.md).
+      # Fill in the actual deploy action/CLI call once a staging hosting
+      # account exists; until then this workflow validates build correctness
+      # on every merge to main without silently claiming a deploy happened.
+      - name: Deploy to staging
+        run: |
+          echo "TODO: wire up the actual staging deploy command for the chosen host (AWS or Render)."
+          echo "This step intentionally fails closed rather than reporting a false-positive deploy."
+          exit 1
+
+      - name: Verify staging health endpoint
+        if: false # enable once the deploy step above is wired up
+        run: |
+          curl --fail --max-time 60 "${{ secrets.STAGING_URL }}/health"
