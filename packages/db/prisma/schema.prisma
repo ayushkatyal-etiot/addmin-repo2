@@ -1,10 +1,19 @@
 // AddMin data layer.
 //
-// Build Step 01 only needs this package to produce a typed Prisma client that
-// both apps/web and apps/api can import — the full entity model (Organization,
-// Office, UtilityAccount, ObligationInstance, etc.) is Build Step 02's scope,
-// per 08-build-playbook.md. A minimal placeholder model is kept here so
-// `prisma generate` and `prisma migrate` have something real to operate on.
+// Build Step 02 (planmysaas-blueprint/08-build-playbook.md): every core
+// entity from 04-architecture.md's "Data models" section, as Prisma models,
+// migrated into the (staging) database, with seed data for one test
+// Organization. Field names and enum values are taken verbatim from
+// 04-architecture.md so this schema stays traceable to the blueprint.
+//
+// Conventions (locked for this and all later build steps):
+// - Every org-scoped table carries orgId; every office-scoped table carries
+//   officeId (indexed) — this is what Step 03's authorization guard filters on.
+// - Money fields are Decimal, never Float.
+// - Every model has createdAt/updatedAt, even where not explicitly listed in
+//   04-architecture.md's compact entity view.
+// - No onDelete: Cascade from any entity onto AuditLog — audit records must
+//   survive the record they describe being hard-deleted.
 
 generator client {
   provider = "prisma-client-js"
@@ -15,9 +24,589 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Placeholder entity, superseded by the full schema in Build Step 02.
-model HealthCheck {
-  id        String   @id @default(cuid())
-  status    String   @default("ok")
-  createdAt DateTime @default(now())
+// ---------------------------------------------------------------------------
+// Organization & Office
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id              String   @id @default(cuid())
+  name            String
+  gstin           String?
+  defaultCurrency String   @default("INR") @map("default_currency")
+  timezone        String   @default("Asia/Kolkata")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  offices  Office[]
+  vendors  Vendor[]
+  landlords Landlord[]
+  users    User[]
+
+  @@map("organizations")
+}
+
+enum OfficeType {
+  head_office
+  regional
+  branch
+  warehouse
+  other
+}
+
+enum OwnershipType {
+  owned
+  rented
+}
+
+enum OfficeSetupStatus {
+  draft
+  setup_incomplete
+  active
+  inactive
+}
+
+model Office {
+  id            String            @id @default(cuid())
+  orgId         String            @map("org_id")
+  name          String
+  address       String
+  officeType    OfficeType        @map("office_type")
+  ownershipType OwnershipType     @map("ownership_type")
+  setupStatus   OfficeSetupStatus @default(draft) @map("setup_status")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  organization        Organization           @relation(fields: [orgId], references: [id])
+  setupProfile        OfficeSetupProfile?
+  checklistItems       OfficeChecklistItem[]
+  utilityAccounts      UtilityAccount[]
+  leases               Lease[]
+  assets               Asset[]
+  maintenanceRequests  MaintenanceRequest[]
+  complianceItems      ComplianceItem[]
+
+  @@index([orgId])
+  @@map("offices")
+}
+
+model OfficeSetupProfile {
+  id            String    @id @default(cuid())
+  officeId      String    @unique @map("office_id")
+  completionPct Decimal   @default(0) @map("completion_pct") @db.Decimal(5, 2)
+  activatedAt   DateTime? @map("activated_at")
+  activatedBy   String?   @map("activated_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  office          Office @relation(fields: [officeId], references: [id])
+  activatedByUser User?  @relation("OfficeActivatedBy", fields: [activatedBy], references: [id])
+
+  @@map("office_setup_profiles")
+}
+
+enum ChecklistCategory {
+  utility
+  facility
+  compliance
+  vendor
+  asset
+  role
+}
+
+enum ChecklistApplicability {
+  yes
+  no
+  not_applicable
+}
+
+enum ChecklistItemStatus {
+  pending
+  configured
+  complete
+}
+
+model OfficeChecklistItem {
+  id               String                 @id @default(cuid())
+  officeId         String                 @map("office_id")
+  templateItemCode String                 @map("template_item_code")
+  category         ChecklistCategory
+  applicability    ChecklistApplicability @default(not_applicable)
+  status           ChecklistItemStatus    @default(pending)
+  ownerUserId      String?                @map("owner_user_id")
+  linkedEntityType String?                @map("linked_entity_type")
+  linkedEntityId   String?                @map("linked_entity_id")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  office    Office @relation(fields: [officeId], references: [id])
+  ownerUser User?  @relation("ChecklistItemOwner", fields: [ownerUserId], references: [id])
+
+  @@index([officeId])
+  @@map("office_checklist_items")
+}
+
+// ---------------------------------------------------------------------------
+// Utility + Obligation Engine
+// ---------------------------------------------------------------------------
+
+enum UtilityType {
+  electricity
+  water
+  internet
+  telephone
+  gas
+  dg
+  ups
+  solar
+  other
+}
+
+enum UtilityBillingCycle {
+  monthly
+  bimonthly
+  quarterly
+}
+
+enum UtilityAccountStatus {
+  active
+  inactive
+}
+
+model UtilityAccount {
+  id             String               @id @default(cuid())
+  officeId       String               @map("office_id")
+  utilityType    UtilityType          @map("utility_type")
+  providerName   String               @map("provider_name")
+  meterAccountNo String               @map("meter_account_no")
+  billingCycle   UtilityBillingCycle  @map("billing_cycle")
+  vendorId       String?              @map("vendor_id")
+  status         UtilityAccountStatus @default(active)
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  office Office  @relation(fields: [officeId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+  bills  UtilityBill[]
+
+  @@index([officeId])
+  @@map("utility_accounts")
+}
+
+enum ObligationScopeType {
+  utility
+  rent
+  cam
+  amc
+  compliance
+}
+
+enum ObligationFrequency {
+  monthly
+  bimonthly
+  quarterly
+  annual
+}
+
+model RecurringObligationSchedule {
+  id                 String              @id @default(cuid())
+  scopeType          ObligationScopeType @map("scope_type")
+  scopeRefId         String              @map("scope_ref_id")
+  frequency          ObligationFrequency
+  expectedWindowDays Int                 @map("expected_window_days")
+  dueRule            String              @map("due_rule")
+  ownerUserId        String              @map("owner_user_id")
+  activeFrom         DateTime            @map("active_from") @db.Date
+  activeTo           DateTime?           @map("active_to") @db.Date
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  ownerUser User                 @relation("ScheduleOwner", fields: [ownerUserId], references: [id])
+  instances ObligationInstance[]
+
+  @@index([scopeType, scopeRefId])
+  @@map("recurring_obligation_schedules")
+}
+
+enum ObligationInstanceStatus {
+  expected
+  received
+  missing
+  in_process
+  closed
+  cancelled
+}
+
+model ObligationInstance {
+  id              String                   @id @default(cuid())
+  scheduleId      String                   @map("schedule_id")
+  period          String
+  expectedDate    DateTime                 @map("expected_date") @db.Date
+  dueDate         DateTime?                @map("due_date") @db.Date
+  status          ObligationInstanceStatus @default(expected)
+  linkedRefType   String?                  @map("linked_ref_type")
+  linkedRefId     String?                  @map("linked_ref_id")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+
+  schedule RecurringObligationSchedule @relation(fields: [scheduleId], references: [id])
+  bills    UtilityBill[]
+
+  // Idempotency key for Step 06's nightly generation job: one instance per
+  // schedule per period, never a duplicate on a re-run.
+  @@unique([scheduleId, period])
+  @@index([scheduleId])
+  @@map("obligation_instances")
+}
+
+enum UtilityBillStatus {
+  draft
+  pending_approval
+  approved
+  rejected
+  partially_paid
+  paid
+  overdue
+}
+
+model UtilityBill {
+  id                   String            @id @default(cuid())
+  utilityAccountId     String            @map("utility_account_id")
+  obligationInstanceId String?           @map("obligation_instance_id")
+  billingPeriod        String            @map("billing_period")
+  amount               Decimal           @db.Decimal(14, 2)
+  dueDate              DateTime          @map("due_date") @db.Date
+  status               UtilityBillStatus @default(draft)
+  invoiceDocId         String?           @map("invoice_doc_id")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  utilityAccount     UtilityAccount      @relation(fields: [utilityAccountId], references: [id])
+  obligationInstance ObligationInstance? @relation(fields: [obligationInstanceId], references: [id])
+
+  @@index([utilityAccountId])
+  @@index([obligationInstanceId])
+  @@map("utility_bills")
+}
+
+// ---------------------------------------------------------------------------
+// Property & Lease
+// ---------------------------------------------------------------------------
+
+model Landlord {
+  id          String   @id @default(cuid())
+  orgId       String   @map("org_id")
+  name        String
+  pan         String?
+  bankDetails Json     @map("bank_details")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  leases       Lease[]
+
+  @@index([orgId])
+  @@map("landlords")
+}
+
+enum LeaseStatus {
+  draft
+  active
+  expiring
+  renewed
+  terminated
+}
+
+model Lease {
+  id              String      @id @default(cuid())
+  officeId        String      @map("office_id")
+  landlordId      String      @map("landlord_id")
+  startDate       DateTime    @map("start_date") @db.Date
+  endDate         DateTime    @map("end_date") @db.Date
+  rentAmount      Decimal     @map("rent_amount") @db.Decimal(14, 2)
+  camAmount       Decimal?    @map("cam_amount") @db.Decimal(14, 2)
+  securityDeposit Decimal?    @map("security_deposit") @db.Decimal(14, 2)
+  escalationPct   Decimal?    @map("escalation_pct") @db.Decimal(5, 2)
+  status          LeaseStatus @default(draft)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  office   Office   @relation(fields: [officeId], references: [id])
+  landlord Landlord @relation(fields: [landlordId], references: [id])
+
+  @@index([officeId])
+  @@index([landlordId])
+  @@map("leases")
+}
+
+// ---------------------------------------------------------------------------
+// Vendor
+// ---------------------------------------------------------------------------
+
+enum VendorCategory {
+  utility_provider
+  dg
+  ups
+  solar
+  amc
+  building_mgmt
+  other
+}
+
+enum VendorStatus {
+  pending_activation
+  active
+  suspended
+  inactive
+}
+
+model Vendor {
+  id        String       @id @default(cuid())
+  orgId     String       @map("org_id")
+  name      String
+  category  VendorCategory
+  panGstin  String?      @map("pan_gstin")
+  status    VendorStatus @default(pending_activation)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  organization    Organization     @relation(fields: [orgId], references: [id])
+  amcContracts    AMCContract[]
+  utilityAccounts UtilityAccount[]
+  workOrders      WorkOrder[]
+
+  @@index([orgId])
+  @@map("vendors")
+}
+
+enum AMCContractStatus {
+  active
+  due_for_renewal
+  expired
+  closed
+}
+
+model AMCContract {
+  id               String            @id @default(cuid())
+  vendorId         String            @map("vendor_id")
+  linkedEntityType String            @map("linked_entity_type")
+  linkedEntityId   String            @map("linked_entity_id")
+  startDate        DateTime          @map("start_date") @db.Date
+  endDate          DateTime          @map("end_date") @db.Date
+  status           AMCContractStatus @default(active)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@index([vendorId])
+  @@map("amc_contracts")
+}
+
+// ---------------------------------------------------------------------------
+// Facility & Maintenance
+// ---------------------------------------------------------------------------
+
+enum MaintenancePriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum MaintenanceRequestStatus {
+  open
+  assigned
+  in_progress
+  resolved
+  closed
+}
+
+model MaintenanceRequest {
+  id        String                    @id @default(cuid())
+  officeId  String                    @map("office_id")
+  category  String
+  priority  MaintenancePriority       @default(medium)
+  status    MaintenanceRequestStatus  @default(open)
+  createdAt DateTime                  @default(now()) @map("created_at")
+  updatedAt DateTime                  @updatedAt @map("updated_at")
+
+  office    Office     @relation(fields: [officeId], references: [id])
+  workOrder WorkOrder?
+
+  @@index([officeId])
+  @@map("maintenance_requests")
+}
+
+enum WorkOrderStatus {
+  assigned
+  in_progress
+  completed
+  verified
+}
+
+model WorkOrder {
+  id                    String          @id @default(cuid())
+  maintenanceRequestId  String          @unique @map("maintenance_request_id")
+  vendorId              String?         @map("vendor_id")
+  slaDueAt              DateTime        @map("sla_due_at")
+  status                WorkOrderStatus @default(assigned)
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  maintenanceRequest MaintenanceRequest @relation(fields: [maintenanceRequestId], references: [id])
+  vendor             Vendor?             @relation(fields: [vendorId], references: [id])
+
+  @@index([vendorId])
+  @@map("work_orders")
+}
+
+// ---------------------------------------------------------------------------
+// Asset
+// ---------------------------------------------------------------------------
+
+enum AssetStatus {
+  available
+  assigned
+  under_service
+  retired
+}
+
+model Asset {
+  id          String      @id @default(cuid())
+  officeId    String      @map("office_id")
+  category    String
+  serialNo    String?     @map("serial_no")
+  status      AssetStatus @default(available)
+  warrantyEnd DateTime?   @map("warranty_end") @db.Date
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  office Office @relation(fields: [officeId], references: [id])
+
+  @@index([officeId])
+  @@map("assets")
+}
+
+// ---------------------------------------------------------------------------
+// Compliance
+// ---------------------------------------------------------------------------
+
+enum ComplianceItemStatus {
+  missing
+  valid
+  expiring
+  expired
+  not_applicable
+}
+
+model ComplianceItem {
+  id              String                @id @default(cuid())
+  officeId        String                @map("office_id")
+  complianceType  String                @map("compliance_type")
+  status          ComplianceItemStatus  @default(missing)
+  expiryDate      DateTime?             @map("expiry_date") @db.Date
+  documentId      String?               @map("document_id")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  office Office @relation(fields: [officeId], references: [id])
+
+  @@index([officeId])
+  @@map("compliance_items")
+}
+
+// ---------------------------------------------------------------------------
+// Payment
+// ---------------------------------------------------------------------------
+
+enum PayableType {
+  utility_bill
+  rent
+  cam
+  vendor
+}
+
+enum PaymentStatus {
+  pending
+  approved
+  initiated
+  paid
+  failed
+  partially_paid
+  overdue
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  payableType   PayableType   @map("payable_type")
+  payableId     String        @map("payable_id")
+  amount        Decimal       @db.Decimal(14, 2)
+  tdsAmount     Decimal?      @map("tds_amount") @db.Decimal(14, 2)
+  netAmount     Decimal       @map("net_amount") @db.Decimal(14, 2)
+  mode          String
+  status        PaymentStatus @default(pending)
+  authorizedBy  String?       @map("authorized_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  authorizedByUser User? @relation("PaymentAuthorizedBy", fields: [authorizedBy], references: [id])
+
+  @@index([payableType, payableId])
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// User & Audit
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  platform_admin
+  office_admin
+  checker
+  payment_authorizer
+  vendor_manager
+  compliance_coordinator
+  facility_staff
+  office_head
+  employee
+}
+
+model User {
+  id          String   @id @default(cuid())
+  orgId       String   @map("org_id")
+  email       String   @unique
+  role        UserRole
+  officeScope Json     @default("[]") @map("office_scope")
+  mfaEnabled  Boolean  @default(false) @map("mfa_enabled")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  organization             Organization                   @relation(fields: [orgId], references: [id])
+  activatedOfficeSetups    OfficeSetupProfile[]            @relation("OfficeActivatedBy")
+  ownedChecklistItems      OfficeChecklistItem[]           @relation("ChecklistItemOwner")
+  ownedSchedules           RecurringObligationSchedule[]   @relation("ScheduleOwner")
+  authorizedPayments       Payment[]                       @relation("PaymentAuthorizedBy")
+  auditLogs                AuditLog[]
+
+  @@index([orgId])
+  @@map("users")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String   @map("actor_user_id")
+  entityType   String   @map("entity_type")
+  entityId     String   @map("entity_id")
+  action       String
+  beforeValue  Json?    @map("before_value")
+  afterValue   Json?    @map("after_value")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // No onDelete: Cascade anywhere onto AuditLog — audit records must survive
+  // even if the actor or the record they describe is later hard-deleted.
+  actorUser User @relation(fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@map("audit_logs")
 }
