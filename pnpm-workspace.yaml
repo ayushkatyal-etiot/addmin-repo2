@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Allow these packages' install-time build scripts to run non-interactively
+# (needed for `prisma generate`'s postinstall step) so CI never blocks on an
+# interactive `pnpm approve-builds` prompt.
+onlyBuiltDependencies:
+  - "@nestjs/core"
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "prisma"
+  - "unrs-resolver"

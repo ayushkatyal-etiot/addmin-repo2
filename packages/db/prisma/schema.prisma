@@ -1,0 +1,23 @@
+// AddMin data layer.
+//
+// Build Step 01 only needs this package to produce a typed Prisma client that
+// both apps/web and apps/api can import — the full entity model (Organization,
+// Office, UtilityAccount, ObligationInstance, etc.) is Build Step 02's scope,
+// per 08-build-playbook.md. A minimal placeholder model is kept here so
+// `prisma generate` and `prisma migrate` have something real to operate on.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Placeholder entity, superseded by the full schema in Build Step 02.
+model HealthCheck {
+  id        String   @id @default(cuid())
+  status    String   @default("ok")
+  createdAt DateTime @default(now())
+}
