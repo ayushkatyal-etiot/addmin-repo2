@@ -12,3 +12,4 @@ out/
 coverage/
 .turbo/
 packages/db/generated/
+*.tsbuildinfo
