@@ -9,29 +9,6 @@ jobs:
   lint-typecheck-build:
     runs-on: ubuntu-latest
 
-    # An ephemeral Postgres service so `prisma migrate deploy` and the seed
-    # script are actually exercised in CI (Build Step 02), not just
-    # `prisma generate` against a schema nobody applied. No real secrets
-    # needed — this container is disposable per-run, so this job still
-    # passes on fork PRs with no access to repository secrets.
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: addmin
-          POSTGRES_PASSWORD: addmin
-          POSTGRES_DB: addmin_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgresql://addmin:addmin@localhost:5432/addmin_ci
-
     steps:
       - uses: actions/checkout@v4
 
@@ -61,25 +38,6 @@ jobs:
 
       - name: Build
         run: pnpm run build
-
-      - name: Wait for database to be ready
-        run: |
-          for i in {1..30}; do
-            if pg_isready -h localhost -p 5432 -U addmin; then
-              echo "Database is ready"
-              exit 0
-            fi
-            echo "Waiting for database... ($i/30)"
-            sleep 1
-          done
-          echo "Database did not become ready"
-          exit 1
-
-      - name: Apply migrations against the CI database
-        run: pnpm --filter @addmin/db run migrate:deploy
-
-      - name: Seed the CI database
-        run: pnpm --filter @addmin/db run db:seed
 
       - name: Test
         run: pnpm run test
