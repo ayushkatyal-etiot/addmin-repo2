@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 import { apiPost } from "../lib/api";
 
 export default function SignupPage() {
@@ -27,55 +32,55 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-6 px-6 py-24">
-      <h1 className="text-2xl font-bold text-gray-900">Create your AddMin account</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-          Organization name
-          <input
-            value={orgName}
-            onChange={(e) => setOrgName(e.target.value)}
-            required
-            className="rounded-lg border-2 border-gray-200 px-4 py-2 text-gray-900 focus:border-primary-600 focus:outline-none"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="rounded-lg border-2 border-gray-200 px-4 py-2 text-gray-900 focus:border-primary-600 focus:outline-none"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
-            required
-            className="rounded-lg border-2 border-gray-200 px-4 py-2 text-gray-900 focus:border-primary-600 focus:outline-none"
-          />
-        </label>
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
+    <main className="flex min-h-screen items-center justify-center px-6 py-24">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>
+            <span className="text-primary">A</span>ddMin
+          </CardTitle>
+          <CardDescription>Create your organization&apos;s account.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="orgName">Organization name</Label>
+              <Input id="orgName" value={orgName} onChange={(e) => setOrgName(e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                required
+              />
+            </div>
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Creating account..." : "Create account"}
+            </Button>
+          </form>
+          <p className="mt-4 text-sm text-muted-foreground">
+            We&apos;ll email you a verification link before you can use AddMin.
           </p>
-        )}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-primary-600 px-6 py-3 font-bold text-white transition duration-200 hover:bg-primary-700 disabled:opacity-50"
-        >
-          {submitting ? "Creating account..." : "Create account"}
-        </button>
-      </form>
-      <p className="text-sm text-gray-600">
-        We&apos;ll email you a verification link before you can use AddMin.
-      </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }

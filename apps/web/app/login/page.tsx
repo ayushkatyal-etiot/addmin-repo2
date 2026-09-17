@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 import { apiPost } from "../lib/api";
 
 export default function LoginPage() {
@@ -47,80 +52,87 @@ export default function LoginPage() {
 
   if (mfaRequired) {
     return (
-      <main className="mx-auto flex max-w-md flex-col gap-6 px-6 py-24">
-        <h1 className="text-2xl font-bold text-gray-900">Enter your MFA code</h1>
-        <form onSubmit={onSubmitMfa} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-            6-digit code
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              required
-              className="rounded-lg border-2 border-gray-200 px-4 py-2 text-gray-900 focus:border-primary-600 focus:outline-none"
-            />
-          </label>
-          {error && (
-            <p role="alert" className="text-sm text-red-600">
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-lg bg-primary-600 px-6 py-3 font-bold text-white transition duration-200 hover:bg-primary-700 disabled:opacity-50"
-          >
-            {submitting ? "Verifying..." : "Verify"}
-          </button>
-        </form>
+      <main className="flex min-h-screen items-center justify-center px-6 py-24">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Enter your MFA code</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={onSubmitMfa} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="code">6-digit code</Label>
+                <Input
+                  id="code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  required
+                />
+              </div>
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Verifying..." : "Verify"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-6 px-6 py-24">
-      <h1 className="text-2xl font-bold text-gray-900">Log in to AddMin</h1>
-      <form onSubmit={onSubmitPassword} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="rounded-lg border-2 border-gray-200 px-4 py-2 text-gray-900 focus:border-primary-600 focus:outline-none"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="rounded-lg border-2 border-gray-200 px-4 py-2 text-gray-900 focus:border-primary-600 focus:outline-none"
-          />
-        </label>
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
+    <main className="flex min-h-screen items-center justify-center px-6 py-24">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>
+            <span className="text-primary">A</span>ddMin
+          </CardTitle>
+          <CardDescription>Log in to see what&apos;s due across your offices.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmitPassword} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Logging in..." : "Log in"}
+            </Button>
+          </form>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <a href="/signup" className="font-medium text-primary hover:underline">
+              Sign up
+            </a>
           </p>
-        )}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-primary-600 px-6 py-3 font-bold text-white transition duration-200 hover:bg-primary-700 disabled:opacity-50"
-        >
-          {submitting ? "Logging in..." : "Log in"}
-        </button>
-      </form>
-      <p className="text-sm text-gray-600">
-        Don&apos;t have an account?{" "}
-        <a href="/signup" className="font-bold text-primary-600 hover:text-primary-700">
-          Sign up
-        </a>
-      </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }
