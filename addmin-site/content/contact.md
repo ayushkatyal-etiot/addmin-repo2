@@ -4,7 +4,7 @@ layout: "simple"
 description: "Talk to us about Enterprise rollout or running AddMin as a design partner for your offices."
 ---
 
-Ready to try AddMin yourself? [Start a free trial](/signup) — no sales call needed.
+Ready to try AddMin yourself? [Start a free trial](http://192.168.30.22:3000/signup) — no sales call needed.
 
 If you're evaluating Enterprise (10+ offices) or want a discounted design-partner paid-pilot rate (3–15 office locations), reach out:
 

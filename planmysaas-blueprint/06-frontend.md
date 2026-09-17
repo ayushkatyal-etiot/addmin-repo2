@@ -70,6 +70,12 @@ ADMIN (Platform Administrator role)
   /admin/workflow                 Approval routing / authorization limits      yes  F-10, F-11
   /admin/notifications             Notification rule configuration             yes  F-08, F-12, F-17
   /admin/audit-logs                Audit trail search                          yes  F-02
+
+PLATFORM OPS (Platform Operator only — separate login, no customer role can reach this tree)
+  /platform/signin                 Platform Operator login (separate from /signin) no  F-20
+  /platform/organizations          List every org: plan, status, tenant_status  yes  F-20
+  /platform/organizations/[orgId]  Org detail: set plan/status, suspend/reactivate yes F-20
+  /platform/audit-logs             Platform-level audit trail (PO actions only) yes  F-20
 ```
 
 ## Page specs (top 8 routes)
@@ -154,6 +160,15 @@ ADMIN (Platform Administrator role)
 - **Empty state**: No compliance items configured — links back to the relevant office's onboarding checklist.
 - **Loading state**: Table skeleton.
 - **Error state**: Inline retry banner above the table on fetch failure.
+
+### /platform/organizations (Platform Operator org list)
+- **Hero / above-fold**: A table of every customer Organization with plan, Subscription status, tenant_status, and trial_ends_at columns — no customer-facing branding or navigation chrome, since this is never seen by a customer.
+- **Sections**: (1) Search/filter bar (name, subscription status), (2) Org table, (3) Row click opens org detail.
+- **Components used**: `<DataTable>`, `<FilterBar>`, `<StatusBadge>`, `<TenantStatusToggle>`.
+- **Data fetched**: `GET /internal/organizations`.
+- **Empty state**: N/A in practice (would only occur pre-launch with zero orgs) — shows a plain "No organizations yet" row.
+- **Loading state**: Table skeleton rows.
+- **Error state**: Full-page retry banner — if this page can't load, there's nothing else useful to show a Platform Operator.
 
 ## Wireframes (text-form)
 
@@ -242,6 +257,7 @@ ADMIN (Platform Administrator role)
 - `<AuditTrailList>` — chronological before/after change list; props: `entries`.
 - `<PlanCard>` — a single subscription plan (Starter/Growth/Enterprise) with price, feature list, and select action; props: `plan`, `isSelected`, `onSelect`.
 - `<TrialBanner>` — persistent trial-days-remaining or trial-expired banner shown across `/app` until the org subscribes; props: `subscription`, `onSubscribeClick`.
+- `<TenantStatusToggle>` — Platform Operator-only active/suspend control with a confirmation step; props: `org`, `onStatusChange`. Never rendered outside `/platform`.
 
 ## Design system
 

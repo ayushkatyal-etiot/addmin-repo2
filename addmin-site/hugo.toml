@@ -54,10 +54,10 @@ enableEmoji = true
     [params.header.buttons]
       [params.header.buttons.signIn]
         text = "Sign in"
-        url = "/signin"
+        url = "http://localhost:3000/login"
       [params.header.buttons.getStarted]
         text = "Start Free Trial"
-        url = "/signup"
+        url = "http://localhost:3000/signup"
 
   [params.blog]
     enable = false
@@ -72,7 +72,7 @@ enableEmoji = true
 
     [params.cta.primary_button]
       text = "Start Free Trial"
-      url = "/signup"
+      url = "http://localhost:3000/signup"
     [params.cta.secondary_button]
       text = "See Pricing"
       url = "/pricing"

@@ -1,1 +1,21 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"><url><loc>https://addmin.example.com/company/</loc></url><url><loc>https://addmin.example.com/features/approvals-payments/</loc></url><url><loc>https://addmin.example.com/categories/</loc></url><url><loc>https://addmin.example.com/contact/</loc></url><url><loc>https://addmin.example.com/features/</loc></url><url><loc>https://addmin.example.com/</loc></url><url><loc>https://addmin.example.com/features/executive-dashboard/</loc></url><url><loc>https://addmin.example.com/pricing/</loc></url><url><loc>https://addmin.example.com/privacy/</loc></url><url><loc>https://addmin.example.com/features/obligation-engine/</loc></url><url><loc>https://addmin.example.com/tags/</loc></url><url><loc>https://addmin.example.com/terms/</loc></url></urlset>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>http://localhost:1313/company/</loc>
+  </url><url>
+    <loc>http://localhost:1313/categories/</loc>
+  </url><url>
+    <loc>http://localhost:1313/contact/</loc>
+  </url><url>
+    <loc>http://localhost:1313/</loc>
+  </url><url>
+    <loc>http://localhost:1313/pricing/</loc>
+  </url><url>
+    <loc>http://localhost:1313/privacy/</loc>
+  </url><url>
+    <loc>http://localhost:1313/tags/</loc>
+  </url><url>
+    <loc>http://localhost:1313/terms/</loc>
+  </url>
+</urlset>

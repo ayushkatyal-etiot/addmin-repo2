@@ -5,7 +5,7 @@
 
 ## How to use this playbook
 
-This is a build sequence, not a wishlist. Each step depends on the previous one working — Step 05's trial/subscription gate assumes Step 04's onboarding already produces an activatable office, Step 06's Recurring Obligation Engine assumes Step 03's authorization layer already rejects cross-office access, and Step 07's approval workflow assumes Step 04's office hierarchy and role assignment already exist. Building out of order means debugging a feature against a foundation that isn't actually solid yet.
+This is a build sequence, not a wishlist. Each step depends on the previous one working — Step 05's trial/subscription gate assumes Step 04's onboarding already produces an activatable office, Step 06's Platform Operator console assumes Step 05's `Subscription` entity already exists, Step 07's Recurring Obligation Engine assumes Step 03's authorization layer already rejects cross-office access, and Step 08's approval workflow assumes Step 04's office hierarchy and role assignment already exist. Building out of order means debugging a feature against a foundation that isn't actually solid yet.
 
 After every step there is a "stop and review" gate. Do not advance until every rubric item checks. The next step assumes everything before it works — if you skip a rubric item because it "probably works," you are borrowing time against a much larger debugging session three steps from now, at which point you won't know which of three unverified layers actually broke.
 
@@ -17,17 +17,20 @@ After every step there is a "stop and review" gate. Do not advance until every r
         └─ 03 Auth + RBAC/office-scope enforcement (F-01, F-02)
              └─ 04 Org/Office hierarchy + Guided Onboarding (F-03, F-04, F-05)
                   └─ 05 Free Trial & Subscription Activation (F-19)
-                       └─ 06 Utility Connection + Recurring Obligation Engine (F-06, F-07, F-08)
-                            └─ 07 Bill Entry + Approval Workflow + Payment Tracking (F-09, F-10, F-11)
-                                 └─ 08 Property & Lease + TDS (F-12, F-13)
-                                      └─ 09 Vendor, Maintenance, Asset, Compliance (F-14, F-15, F-16, F-17)
-                                           └─ 10 Reporting: Office Home, My Actions, Executive Dashboard (F-18)
-                                                └─ 11 Frontend polish (loading/empty/error states, design system)
-                                                     └─ 12 Production deploy + observability
-                                                          └─ 13 Post-launch ops & runbooks (root)
+                       └─ 06 Platform Operator Console (F-20)
+                            └─ 07 Utility Connection + Recurring Obligation Engine (F-06, F-07, F-08)
+                                 └─ 08 Bill Entry + Approval Workflow + Payment Tracking (F-09, F-10, F-11)
+                                      └─ 09 Property & Lease + TDS (F-12, F-13)
+                                           └─ 10 Vendor, Maintenance, Asset, Compliance (F-14, F-15, F-16, F-17)
+                                                └─ 11 Reporting: Office Home, My Actions, Executive Dashboard (F-18)
+                                                     └─ 12 Frontend polish (loading/empty/error states, design system)
+                                                          └─ 13 Production deploy + observability
+                                                               └─ 14 Post-launch ops & runbooks (root)
 ```
 
-The marketing site (`addmin-site/`) now sends every "Start Free Trial" click into Step 03's signup flow, which chains into Step 04's onboarding and Step 05's subscription activation — this is the register → onboard → subscribe order the marketing site's CTA promises, and Step 05 exists specifically to make that promise true in the product, not just in copy. Step 05's subscription billing is AddMin's own SaaS billing (charging the customer for using AddMin) — do not confuse it with the Payment module in Step 07, which tracks the *customer's* utility/rent payments to their own vendors and landlords. Payment Execution Mode for that customer-facing payment flow remains deferred to Phase 4 per `07-phases.md`.
+The marketing site (`addmin-site/`) now sends every "Start Free Trial" click into Step 03's signup flow, which chains into Step 04's onboarding and Step 05's subscription activation — this is the register → onboard → subscribe order the marketing site's CTA promises, and Step 05 exists specifically to make that promise true in the product, not just in copy. Step 05's subscription billing is AddMin's own SaaS billing (charging the customer for using AddMin) — do not confuse it with the Payment module in Step 08, which tracks the *customer's* utility/rent payments to their own vendors and landlords. Payment Execution Mode for that customer-facing payment flow remains deferred to Phase 4 per `07-phases.md`.
+
+**If you've already completed Step 02** (this repo has — see `d992408 Build Step 02: Prisma data layer (all 19 core entities)`): Step 06 below adds `tenant_status` to `Organization` and a new `PlatformOperator` entity via an **additive migration**, not a redo of Step 02. Do not edit or revert the existing Step 02 migration file — create a new one on top of it, exactly as any schema change after initial launch would work in production.
 
 ---
 
@@ -90,8 +93,8 @@ packages/db/              Prisma schema + generated client (shared package)
 
 ### ❌ Common pitfalls (do NOT do these)
 - Don't commit a `.env` file with real staging credentials — this leaks into git history permanently even if deleted later.
-- Don't put business logic directly in NestJS controllers "just for now" — this pattern spreads and by Step 07 you'll have authorization checks scattered across a dozen controllers instead of centralized in Step 03's guard.
-- Don't skip the CI typecheck step to "move faster" — Prisma schema changes silently break consumers without it, and you won't find out until Step 06's Obligation Engine throws a runtime error.
+- Don't put business logic directly in NestJS controllers "just for now" — this pattern spreads and by Step 08 you'll have authorization checks scattered across a dozen controllers instead of centralized in Step 03's guard.
+- Don't skip the CI typecheck step to "move faster" — Prisma schema changes silently break consumers without it, and you won't find out until Step 07's Obligation Engine throws a runtime error.
 
 ### 📊 Quality bar
 - CI pipeline completes in under 5 minutes.
@@ -159,7 +162,7 @@ packages/db/prisma/seed.ts            Test org/office/users seed script
 - `Landlord.bank_details` and similar `Json` fields must have an application-level shape validated at the service layer (Step 04+), since Postgres `Json` columns don't enforce structure.
 
 ### ❌ Common pitfalls (do NOT do these)
-- Don't use `Float` for any money field — this WILL cause a TDS calculation mismatch in Step 08 that's painful to trace back to its root cause.
+- Don't use `Float` for any money field — this WILL cause a TDS calculation mismatch in Step 09 that's painful to trace back to its root cause.
 - Don't add a Group/Organization-of-Organizations table now "to be ready for later" — `03-analysis.md` explicitly says defer the Epic 0 multi-tenant Group layer; adding it here is exactly the scope creep that analysis warns against.
 - Don't skip the seed script — Step 03's authorization tests and Step 04's onboarding flow both need realistic seed data to test against, and writing it later means retrofitting tests that should have existed from day one.
 
@@ -260,7 +263,7 @@ If any of these fail, do not proceed — Step 04 onward assumes this layer is ai
 An Admin can create an office and complete the full guided onboarding wizard (Owned/Rented → Utilities → Facilities → Compliance → Vendors → Assets → Roles → Review) and activate the office, without ever seeing a generic expense form.
 
 ### 📍 Why this is the leaf
-This is the product's core differentiator per `02-research.md` and `03-analysis.md` — it's what makes AddMin "obligation-first, not expense-first." Steps 05-08 all attach their setup flows into this checklist (e.g., marking a utility "Yes" in Step 04 must create the actual `UtilityAccount` record built in Step 06).
+This is the product's core differentiator per `02-research.md` and `03-analysis.md` — it's what makes AddMin "obligation-first, not expense-first." Steps 05-08 all attach their setup flows into this checklist (e.g., marking a utility "Yes" in Step 04 must create the actual `UtilityAccount` record built in Step 07).
 
 ### 📥 Inputs (preconditions before you start)
 - Step 03 complete: a logged-in, MFA-verified Admin session exists
@@ -329,7 +332,7 @@ apps/web/app/offices/[officeId]/setup/page.tsx        completion % + activate
 A visitor who clicks "Start Free Trial" on the marketing site lands in a 14-day trial the moment their account is created (Step 03), completes Guided Onboarding (Step 04) with no payment method required, and can activate a paid subscription from `/app/subscribe` at any point — with the org's access correctly gated once the trial ends without a chosen plan.
 
 ### 📍 Why this is the leaf
-This step exists because the marketing site's primary conversion path (`addmin-site/content/_index.md`, `pricing.md`, `hugo.toml`) now sends every "Start Free Trial" click straight into the product, not into a sales form. That marketing promise — register → onboard → subscribe — has to be a real, gated sequence in the product, not just landing-page copy. Step 06 onward assumes an `Organization` has a resolved subscription/trial state; without this step, there is no server-side answer to "is this org allowed to keep using AddMin," which becomes a real question the moment a trial expires.
+This step exists because the marketing site's primary conversion path (`addmin-site/content/_index.md`, `pricing.md`, `hugo.toml`) now sends every "Start Free Trial" click straight into the product, not into a sales form. That marketing promise — register → onboard → subscribe — has to be a real, gated sequence in the product, not just landing-page copy. Step 07 onward assumes an `Organization` has a resolved subscription/trial state; without this step, there is no server-side answer to "is this org allowed to keep using AddMin," which becomes a real question the moment a trial expires.
 
 ### 📥 Inputs (preconditions before you start)
 - Step 03 complete: signup creates an `Organization` + first `User` and issues a session
@@ -399,13 +402,90 @@ apps/web/app/subscribe/page.tsx                       plan selection + payment m
 
 ---
 
-## Build Step 06 — Utility Connection + Recurring Obligation Engine (F-06, F-07, F-08)
+## Build Step 06 — Platform Operator Console (F-20)
+
+### 🎯 Goal
+A Platform Operator — an AddMin-internal identity, never a customer role — can log into a separate `/platform` login, see every customer Organization with its plan/Subscription/tenant status, and manually activate a Subscription or suspend/reactivate a tenant; no customer-scoped session can reach any of it.
+
+### 📍 Why this is the leaf
+F-19's own alternate flow (the sales-assisted Enterprise/design-partner path) already assumes someone inside AddMin can set a `Subscription` to `active` outside the self-serve flow — Step 05 built the state machine but nothing that lets a human actually drive it for that case. This step is intentionally small: per `03-analysis.md`'s scoping decision, it implements a single internal role with cross-org read/write on two fields, not Epic 0's full Group hierarchy, Membership abstraction, permission catalogue, or break-glass consent flow. Steps 07 onward don't depend on this one technically, but it must exist before Phase 2's first sales-assisted pilot organization is onboarded (per `07-phases.md`).
+
+### 📥 Inputs (preconditions before you start)
+- Step 02 complete: the 19 core entities are already migrated and seeded (per this repo's own history — `d992408`)
+- Step 05 complete: `Subscription` exists and its state machine (`trialing → active → past_due → expired → canceled`) works
+- Step 03 complete: `AuthzGuard` and the audit-logging pattern are established — this step reuses both patterns for a new, deliberately separate identity type
+
+### 📤 Outputs (what exists after this step passes)
+- An **additive** migration adding `tenant_status` (enum: `active`, `suspended`, default `active`) to `Organization`, and a new `PlatformOperator` table — entirely separate from the customer `User` table, per `04-architecture.md`'s data model
+- `/platform/signin`, `/platform/organizations`, `/platform/organizations/[orgId]` frontend routes, reachable only by a `PlatformOperator` session
+- `GET /internal/organizations`, `PATCH /internal/organizations/:id/tenant-status`, `PATCH /internal/organizations/:id/subscription` API endpoints, gated by a new `PlatformOperatorGuard` distinct from Step 03's `AuthzGuard`
+- A `TenantStatusGuard` check layered into the existing request pipeline: a `suspended` org's API calls are rejected regardless of role, office scope, or subscription status
+
+### 🛠 Implementation details
+
+**Files to create:**
+```
+packages/db/prisma/migrations/<timestamp>_add_platform_operator/   additive migration — do not touch the Step 02 migration
+apps/api/src/platform-ops/platform-operator-auth.service.ts        separate login/session issuance for PlatformOperator
+apps/api/src/platform-ops/platform-operator.guard.ts                rejects any request without a valid PlatformOperator session
+apps/api/src/platform-ops/tenant-status.guard.ts                    rejects any request where Organization.tenant_status = suspended
+apps/api/src/platform-ops/platform-organizations.service.ts         cross-org list/read/write on Organization + Subscription
+apps/web/app/platform/signin/page.tsx
+apps/web/app/platform/organizations/page.tsx
+apps/web/app/platform/organizations/[orgId]/page.tsx
+```
+
+**Tech decisions** (locked from blueprint stage 04 — extend, do not re-litigate the core stack):
+- `PlatformOperator` is its own table with its own session/login flow, never a row in `User` with a special role flag — this mirrors Epic 0's actual design (a platform-level identity is not a Membership of any org) and, more practically, makes it structurally impossible for a customer-side privilege escalation bug to ever grant Platform Operator access, since the two tables share no schema.
+- `TenantStatusGuard` runs independently of and in addition to Step 03's `AuthzGuard` and Step 05's `SubscriptionGuard` — three separate gates (authorization, billing, tenant status), each with its own single responsibility, none merged into a combined mega-check.
+- The `/platform` route tree is never linked from the customer `Web App` — no shared layout, no shared nav component, so there is no accidental code path from a customer session into a Platform Operator page.
+
+**Patterns (mandatory across the codebase):**
+- Every `/internal/*` endpoint requires `PlatformOperatorGuard` explicitly — there is no global default that could accidentally expose one, mirroring Step 03's "protected by default" rule but for a completely separate identity space.
+- Every write from `platform-organizations.service.ts` produces an `AuditLog` entry tagged with the acting `PlatformOperator`'s id, using the exact same Audit Module as every other write in the system — there is no separate, weaker audit path for internal tooling.
+- `Organization.tenant_status` is changed only through `PlatformOperationsModule` — no other module ever writes this field, so `grep`ing for writes to `tenant_status` should return exactly one call site.
+
+### ✅ Acceptance rubric
+- [ ] The additive migration runs cleanly on top of the existing Step 02 migration history with zero changes to already-applied migration files.
+- [ ] A valid customer `User` session (any role, including the org-scoped "Platform Administrator") receives a 403 when calling any `/internal/*` endpoint or loading `/platform/*` — verified with a direct test using a real customer session token.
+- [ ] `/platform/organizations` lists every seeded Organization with correct plan, Subscription status, and tenant_status.
+- [ ] Setting a Subscription to `active` with a chosen plan through `/platform/organizations/[orgId]` produces the identical state as F-19's self-serve `/app/subscribe` path — verified by checking the customer's next `/app` load sees no special-casing.
+- [ ] Suspending an org's `tenant_status` causes every subsequent API call from that org's users to fail, even for an org whose `Subscription.status` is `active` — tested by suspending a test org with an active subscription and confirming access is still blocked.
+- [ ] Reactivating a suspended org restores access on its very next API call, with no re-login required by the affected customer users.
+- [ ] Every tenant-status or subscription change made via `/platform` produces an `AuditLog` entry identifying the acting `PlatformOperator`, distinguishable from customer-side audit entries.
+- [ ] `PlatformOperator` accounts require MFA before they can access `/platform/organizations`.
+
+### ⚠️ Edge cases to handle
+- A Platform Operator suspends an org mid-trial — `trial_ends_at` and `Subscription.status` are untouched; suspension is orthogonal, so reactivating returns the org to exactly the trial/subscription state it had before suspension.
+- Two Platform Operators edit the same org concurrently — the later write wins and is fully audited, but the UI should surface a "this record changed since you loaded it" warning rather than silently overwriting.
+- A suspended org's user attempts to log in — they see a specific "your organization's access has been suspended, contact support" message, not a generic authentication failure or a confusing blank state.
+
+### ❌ Common pitfalls (do NOT do these)
+- Don't add a `platform_operator: boolean` flag to the existing `User` table "to save a migration" — this collapses the deliberate separation between customer identities and AddMin-internal identities that makes cross-tenant privilege escalation structurally impossible; a shared table makes it merely a bug away.
+- Don't let `TenantStatusGuard` and Step 05's `SubscriptionGuard` become one combined check "since they're related" — an org can be suspended with an active subscription (e.g., abuse) or active with an expired trial; conflating them produces incorrect access decisions in exactly the cases this feature exists to handle correctly.
+- Don't edit the Step 02 migration file to add `tenant_status` retroactively — this repository already ran that migration in production/staging (commit `d992408`); editing history instead of adding a new migration will desync any environment that already applied it.
+- Don't skip MFA for `PlatformOperator` accounts because "it's just internal" — this is the single account type in the entire system with cross-org access; it is the highest-value target in the product, not the lowest.
+
+### 📊 Quality bar
+- `/internal/*` endpoints reject an unauthenticated or customer-scoped request in under 100ms (fail fast, no unnecessary work before the guard check).
+- Zero shared code path between `PlatformOperatorGuard` and `AuthzGuard` beyond the underlying session-verification primitive — confirmed by code review, not just testing.
+
+### 🛑 Stop and review (gate before next step)
+1. Apply the new migration on a copy of the current (already-Step-02-migrated) database — confirm it applies cleanly and existing seeded data is untouched.
+2. Attempt to load `/platform/organizations` using a valid customer session token (any role) — confirm 403.
+3. Log in as a seeded `PlatformOperator`, view the org list, set a test org's Subscription to `active` on a chosen plan, then suspend a different test org.
+4. Attempt an API call as a user belonging to the suspended org — confirm it is blocked, then reactivate the org and confirm the same call succeeds immediately without that user logging out and back in.
+5. Check the audit log for both actions — confirm each is attributed to the acting Platform Operator, not to any customer identity.
+
+---
+
+## Build Step 07 — Utility Connection + Recurring Obligation Engine (F-06, F-07, F-08)
 
 ### 🎯 Goal
 Creating a utility connection automatically generates a recurring obligation schedule; the nightly job generates the next expected bill instance ahead of time; an instance that passes its expected window without a linked bill is automatically flagged Missing and notified.
 
 ### 📍 Why this is the leaf
-This is the structural moat identified in `03-analysis.md` — the feature no competitor in `02-research.md`'s research has. Step 07's entire bill-approval-payment flow operates on the `ObligationInstance` records this engine produces; without this step working correctly first, Step 07 has nothing real to attach bills to.
+This is the structural moat identified in `03-analysis.md` — the feature no competitor in `02-research.md`'s research has. Step 08's entire bill-approval-payment flow operates on the `ObligationInstance` records this engine produces; without this step working correctly first, Step 08 has nothing real to attach bills to.
 
 ### 📥 Inputs (preconditions before you start)
 - Step 04 complete: an active office exists with utilities marked "Yes" in onboarding
@@ -468,7 +548,7 @@ apps/web/app/utilities/[id]/page.tsx
 
 ---
 
-## Build Step 07 — Bill Entry + Approval Workflow + Payment Tracking (F-09, F-10, F-11)
+## Build Step 08 — Bill Entry + Approval Workflow + Payment Tracking (F-09, F-10, F-11)
 
 ### 🎯 Goal
 A bill can be entered, submitted, approved (or rejected/returned) by a Checker with mandatory remarks on rejection/return, and paid/recorded by a Payment Authorizer within their configured authorization limit — the full flow the PRD's acceptance criteria calls "end-to-end."
@@ -477,7 +557,7 @@ A bill can be entered, submitted, approved (or rejected/returned) by a Checker w
 This is the first fully closed obligation lifecycle in the product and the flow every design-partner demo in `07-phases.md`'s Phase 1 exit criteria depends on. It is also the first place Step 03's segregation-of-duties enforcement gets exercised against real financial actions, not just a synthetic test.
 
 ### 📥 Inputs (preconditions before you start)
-- Step 06 complete: `ObligationInstance` records with status `expected`/`missing` exist to attach bills to
+- Step 07 complete: `ObligationInstance` records with status `expected`/`missing` exist to attach bills to
 - Step 04's role assignment step has assigned at least one Checker and one Payment Authorizer to the test office
 
 ### 📤 Outputs (what exists after this step passes)
@@ -505,7 +585,7 @@ apps/web/app/approvals/page.tsx
 
 **Patterns:**
 - Reject/Return actions share one endpoint shape requiring a non-empty `remark` field, validated server-side (not just a frontend `required` attribute) — per F-10's acceptance criteria.
-- Bill status transitions go through a single `BillService.transitionStatus()` method mirroring the pattern established in Step 06 for obligation instances — no direct Prisma `update` calls to `status` scattered across the codebase.
+- Bill status transitions go through a single `BillService.transitionStatus()` method mirroring the pattern established in Step 07 for obligation instances — no direct Prisma `update` calls to `status` scattered across the codebase.
 
 ### ✅ Acceptance rubric
 - [ ] Bill entry rejects an amount ≤ 0 and a missing due date before allowing save.
@@ -541,7 +621,7 @@ apps/web/app/approvals/page.tsx
 
 ---
 
-## Build Step 08 — Property & Lease + TDS (F-12, F-13)
+## Build Step 09 — Property & Lease + TDS (F-12, F-13)
 
 ### 🎯 Goal
 A rented office has a landlord, lease, and auto-generated monthly rent obligation; renewal reminders fire at configured intervals; TDS is calculated correctly on rent payments and blocked when a TDS-applicable landlord has no configured rate.
@@ -550,7 +630,7 @@ A rented office has a landlord, lease, and auto-generated monthly rent obligatio
 This closes the second problem cluster from `02-research.md` (lease expiry surprises) and the TDS risk flagged as requiring Finance/CA sign-off in `03-analysis.md`'s risk matrix — get the TDS math wrong here and it damages the exact trust this feature is meant to build.
 
 ### 📥 Inputs (preconditions before you start)
-- Step 07 complete: Payment recording and authorization-limit enforcement already work for utility bills — Lease rent payments reuse the same `PaymentService`
+- Step 08 complete: Payment recording and authorization-limit enforcement already work for utility bills — Lease rent payments reuse the same `PaymentService`
 - Step 04's onboarding wizard already branches into "Rented" — this step implements what that branch creates
 
 ### 📤 Outputs (what exists after this step passes)
@@ -572,10 +652,10 @@ apps/web/app/property/leases/[id]/page.tsx
 
 **Tech decisions:**
 - TDS rate resolution order: landlord-specific override → organization default → block if neither exists and landlord is flagged TDS-applicable. This resolution logic lives in one function (`TdsService.resolveRate()`), never duplicated inline at each call site.
-- Lease renewal reuses the same notification infrastructure built for Step 06's missing-bill alerts, not a separate one-off reminder mechanism.
+- Lease renewal reuses the same notification infrastructure built for Step 07's missing-bill alerts, not a separate one-off reminder mechanism.
 
 **Patterns:**
-- Rent obligation generation reuses `ObligationScheduleService` from Step 06 exactly as-is (scope_type = `rent`) — do not fork a parallel obligation mechanism specific to leases.
+- Rent obligation generation reuses `ObligationScheduleService` from Step 07 exactly as-is (scope_type = `rent`) — do not fork a parallel obligation mechanism specific to leases.
 - Escalation clause application is a scheduled job that updates the schedule's amount at the configured effective date — it does not retroactively change already-generated past instances.
 
 ### ✅ Acceptance rubric
@@ -594,7 +674,7 @@ apps/web/app/property/leases/[id]/page.tsx
 
 ### ❌ Common pitfalls (do NOT do these)
 - Don't calculate TDS as a client-side display-only value that the server doesn't independently verify before recording the payment — the net payable amount must be computed and validated server-side.
-- Don't build a separate obligation-generation code path for rent "since it's slightly different from utility bills" — this duplicates Step 06's carefully-built idempotency and status-transition logic; extend the existing engine instead.
+- Don't build a separate obligation-generation code path for rent "since it's slightly different from utility bills" — this duplicates Step 07's carefully-built idempotency and status-transition logic; extend the existing engine instead.
 - Don't go live with TDS calculation against real payments before Finance/CA sign-off on rate configuration, per the explicit open decision in the PRD's Section 30 — gate this behind a feature flag if a design partner needs the rest of the lease module before that sign-off lands.
 
 ### 📊 Quality bar
@@ -609,7 +689,7 @@ apps/web/app/property/leases/[id]/page.tsx
 
 ---
 
-## Build Step 09 — Vendor, Maintenance, Asset, Compliance (F-14, F-15, F-16, F-17)
+## Build Step 10 — Vendor, Maintenance, Asset, Compliance (F-14, F-15, F-16, F-17)
 
 ### 🎯 Goal
 Vendors can be registered and linked to AMC contracts with renewal alerts; maintenance requests route to vendors with SLA tracking and evidence capture; assets can be registered and requested/allocated through the Employee → Manager → Admin flow; compliance certificates are tracked with expiry alerts and escalation.
@@ -618,8 +698,8 @@ Vendors can be registered and linked to AMC contracts with renewal alerts; maint
 These four modules complete the P0 module set from `07-phases.md`'s Phase 2 and are what makes AddMin usable for a design partner's full real office, not just the utility/lease wedge. They share the Obligation Engine (AMC and compliance renewal) and Workflow modules built in Steps 05-06, so building them after those steps reuses infrastructure instead of duplicating it.
 
 ### 📥 Inputs (preconditions before you start)
-- Step 06's Obligation Engine (AMC and compliance items reuse the same schedule/instance mechanism)
-- Step 07's Workflow module (asset request approval reuses the Maker-Checker pattern)
+- Step 07's Obligation Engine (AMC and compliance items reuse the same schedule/instance mechanism)
+- Step 08's Workflow module (asset request approval reuses the Maker-Checker pattern)
 
 ### 📤 Outputs (what exists after this step passes)
 - Vendor registration, activation gating, and AMC renewal alerts (F-14)
@@ -645,7 +725,7 @@ apps/web/app/vendors/**, /app/maintenance/**, /app/assets/**, /app/compliance/**
 
 **Tech decisions:**
 - AMC renewal and Compliance expiry both create `RecurringObligationSchedule` records (scope_type = `amc` / `compliance`) — same engine as utility and rent, no new mechanism.
-- Asset request approval reuses the `ApprovalService` abstraction from Step 07, configured with a different chain (Employee → Manager → Admin) rather than a bespoke state machine.
+- Asset request approval reuses the `ApprovalService` abstraction from Step 08, configured with a different chain (Employee → Manager → Admin) rather than a bespoke state machine.
 
 **Patterns:**
 - Photo/video evidence uploads go through the shared Document module (`04-architecture.md`), tagged with `before`/`after` and uploader/timestamp — not a maintenance-specific upload path.
@@ -667,7 +747,7 @@ apps/web/app/vendors/**, /app/maintenance/**, /app/assets/**, /app/compliance/**
 - A compliance certificate is renewed with a backdated effective date — expiry countdown uses the new certificate's actual expiry date, not the date the renewal was recorded.
 
 ### ❌ Common pitfalls (do NOT do these)
-- Don't build a bespoke state machine for asset-request approval "because it's a bit different" — reusing Step 07's `ApprovalService` with a different configured chain keeps segregation-of-duties enforcement consistent everywhere, including here.
+- Don't build a bespoke state machine for asset-request approval "because it's a bit different" — reusing Step 08's `ApprovalService` with a different configured chain keeps segregation-of-duties enforcement consistent everywhere, including here.
 - Don't let compliance escalation silently stop once a certificate is marked Expired without renewal — per PRD Section 23, expired/missing mandatory compliance must remain visible until renewed or explicitly marked Not Applicable by an authorized role, not just logged once and forgotten.
 - Don't allow a vendor performance review to be skippable before an AMC renewal decision if the organization has configured it as required — check this server-side, not just as a UI nudge.
 
@@ -683,7 +763,7 @@ apps/web/app/vendors/**, /app/maintenance/**, /app/assets/**, /app/compliance/**
 
 ---
 
-## Build Step 10 — Reporting: Office Home, My Actions, Executive Dashboard (F-18)
+## Build Step 11 — Reporting: Office Home, My Actions, Executive Dashboard (F-18)
 
 ### 🎯 Goal
 Every dashboard reads live transactional data (never dummy KPIs), My Actions aggregates pending items across every module built in Steps 05-08 into one queue, and the Executive Dashboard's every KPI drills down to its source records.
@@ -719,7 +799,7 @@ apps/web/app/reports/executive/page.tsx
 
 **Patterns:**
 - Every dashboard component that displays a KPI accepts an `onDrillDown` handler that navigates to the filtered source-record list — never a static number with no click target.
-- No dashboard query result is ever mocked, stubbed, or hard-coded in a way that could reach a production or demo environment — this is checked explicitly in the Step 10 review gate below, not assumed.
+- No dashboard query result is ever mocked, stubbed, or hard-coded in a way that could reach a production or demo environment — this is checked explicitly in the Step 11 review gate below, not assumed.
 
 ### ✅ Acceptance rubric
 - [ ] Office Home for a newly activated office with zero obligations yet shows an explicit "getting started" empty state, not a broken or misleadingly-zeroed chart.
@@ -752,7 +832,7 @@ apps/web/app/reports/executive/page.tsx
 
 ---
 
-## Build Step 11 — Frontend polish (loading/empty/error states, design system)
+## Build Step 12 — Frontend polish (loading/empty/error states, design system)
 
 ### 🎯 Goal
 Every route listed in `06-frontend.md`'s sitemap has an explicit, tested loading state, empty state, and error state — no route shows a blank white screen or an unhandled exception under any of the conditions listed in each page spec.
@@ -817,7 +897,7 @@ apps/web/components/domain/*.tsx        ObligationCard, ActionQueueItem, Approva
 
 ---
 
-## Build Step 12 — Production deploy + observability
+## Build Step 13 — Production deploy + observability
 
 ### 🎯 Goal
 The full application is deployed to a production environment (separate from staging) with error monitoring, structured logging, and alerting configured, meeting the PRD's stated NFRs for availability and performance.
@@ -885,13 +965,13 @@ load-tests/dashboard-load.k6.js            load test script matching PRD NFRs
 
 ---
 
-## Build Step 13 — Post-launch ops & runbooks
+## Build Step 14 — Post-launch ops & runbooks
 
 ### 🎯 Goal
 A documented runbook exists for the top 5 operational failure scenarios (missed job run, authorization gap discovered, TDS calculation dispute, design-partner onboarding blocker, production incident), so a failure at 2am doesn't require re-deriving the system's behavior from source code under pressure.
 
 ### 📍 Why this is the root
-This is the last node in the tree because it depends on everything above it actually existing and working — you cannot write a meaningful runbook for "the obligation job silently failed" until Step 06's job and Step 12's alerting both exist and have been exercised.
+This is the last node in the tree because it depends on everything above it actually existing and working — you cannot write a meaningful runbook for "the obligation job silently failed" until Step 07's job and Step 13's alerting both exist and have been exercised.
 
 ### 📥 Inputs (preconditions before you start)
 - Steps 01-11 complete and deployed to production
@@ -916,7 +996,7 @@ docs/support-handover-checklist.md
 
 **Patterns:**
 - Every runbook follows the same shape: symptom → diagnostic query/command → likely root causes → remediation steps → how to confirm it's fixed → what to tell the affected customer.
-- Runbooks reference actual entity/table names from `04-architecture.md` and actual job names from Step 06/08, not generic placeholders — a runbook a future on-call engineer can't act on without re-reading the entire codebase first has failed its purpose.
+- Runbooks reference actual entity/table names from `04-architecture.md` and actual job names from Step 07/08, not generic placeholders — a runbook a future on-call engineer can't act on without re-reading the entire codebase first has failed its purpose.
 
 ### ✅ Acceptance rubric
 - [ ] Each of the 5 runbooks includes a copy-pasteable diagnostic query or command specific to this codebase (e.g., a query to check `RecurringObligationSchedule` records with no corresponding recent `ObligationInstance`).
@@ -951,20 +1031,21 @@ docs/support-handover-checklist.md
 - [ ] Step 03: 100% of API endpoints covered by authorization tests; cross-office access verified blocked and audit-logged.
 - [ ] Step 04: An Admin can onboard and activate a real office without touching a generic expense form.
 - [ ] Step 05: Trial starts at signup with no card required; `/app/subscribe` correctly activates a paid plan and gates access on trial expiry.
-- [ ] Step 06: Recurring Obligation Engine generates instances ahead of due dates; Missing Bill Alert fires correctly.
-- [ ] Step 07: Full bill lifecycle (enter → approve → pay → close) works with enforced segregation of duties.
-- [ ] Step 08: Lease/rent obligations auto-generate; TDS calculation verified accurate against a test matrix.
-- [ ] Step 09: Vendor/AMC, Maintenance, Asset, and Compliance modules all functional with their respective escalation paths.
-- [ ] Step 10: Every dashboard reads live data only; zero mocked KPIs reachable in any non-test environment.
-- [ ] Step 11: Every route has a tested loading/empty/error state; WCAG 2.1 AA accessibility score ≥ 90 on key pages.
-- [ ] Step 12: Production deployed, isolated from staging, meeting the PRD's stated NFRs under load test.
-- [ ] Step 13: All 5 runbooks written, simulated, and exercised by someone other than the original builder.
+- [ ] Step 06: Platform Operator can manage org subscription/tenant status via `/platform`; no customer session can reach it; suspension blocks access independent of subscription status.
+- [ ] Step 07: Recurring Obligation Engine generates instances ahead of due dates; Missing Bill Alert fires correctly.
+- [ ] Step 08: Full bill lifecycle (enter → approve → pay → close) works with enforced segregation of duties.
+- [ ] Step 09: Lease/rent obligations auto-generate; TDS calculation verified accurate against a test matrix.
+- [ ] Step 10: Vendor/AMC, Maintenance, Asset, and Compliance modules all functional with their respective escalation paths.
+- [ ] Step 11: Every dashboard reads live data only; zero mocked KPIs reachable in any non-test environment.
+- [ ] Step 12: Every route has a tested loading/empty/error state; WCAG 2.1 AA accessibility score ≥ 90 on key pages.
+- [ ] Step 13: Production deployed, isolated from staging, meeting the PRD's stated NFRs under load test.
+- [ ] Step 14: All 5 runbooks written, simulated, and exercised by someone other than the original builder.
 - [ ] At least one design-partner organization has completed a full billing cycle (bill → approval → payment → closed) in production.
 - [ ] Setup Completion % for that design partner's first office is ≥ 90%.
 
 ## What to do when a step fails
 
-1. **Don't skip ahead.** Each step is a foundation. Skipping creates a debt you'll pay 10x later — Step 07's approval workflow debugging is much harder if you're not sure whether Step 03's authorization layer or Step 06's obligation engine is the actual source of a bug.
+1. **Don't skip ahead.** Each step is a foundation. Skipping creates a debt you'll pay 10x later — Step 08's approval workflow debugging is much harder if you're not sure whether Step 03's authorization layer or Step 07's obligation engine is the actual source of a bug.
 2. **Re-read the dependency.** Most failures are caused by a missed input from the prior step — check the "Inputs" section of the failing step against what the prior step's "Outputs" actually produced.
 3. **Check the pitfalls list first** — it exists because a specific, named failure mode was anticipated for this exact step; check there before assuming you've found a novel bug.
 4. **Bisect the failing rubric item.** Identify the smallest change that broke it; revert if needed rather than debugging forward from a known-broken state.
@@ -974,6 +1055,6 @@ docs/support-handover-checklist.md
 
 This playbook is specific to AddMin's actual entities, feature IDs, and route paths — every step references real names from `04-architecture.md` (RecurringObligationSchedule, ObligationInstance), `05-features.md` (F-01 through F-18), and `06-frontend.md` (the exact route paths and component names), not generic placeholders. A generic "build the auth system" instruction gives you no way to verify you built the *specific* authorization model this PRD requires — office-scoped, segregation-of-duties-enforced, server-side-checked.
 
-It sequences leaf to root because that is the actual dependency reality of this system: you cannot correctly build the bill-approval workflow (Step 07) before the authorization layer (Step 03) it depends on for segregation-of-duties enforcement, and you cannot build a truthful Executive Dashboard (Step 10) before the transactional modules (Steps 05-08) whose data it aggregates actually exist.
+It sequences leaf to root because that is the actual dependency reality of this system: you cannot correctly build the bill-approval workflow (Step 08) before the authorization layer (Step 03) it depends on for segregation-of-duties enforcement, and you cannot build a truthful Executive Dashboard (Step 11) before the transactional modules (Steps 05-08) whose data it aggregates actually exist.
 
 It gates with observable rubrics because "I think this works" is not the same claim as "I verified this works," and the difference between those two claims is exactly where B2B financial-workflow software goes wrong in front of a paying customer. If a step in this playbook feels generic to you as you work through it, that's a signal you're missing context — go back and re-read the relevant blueprint stage (01 through 07) before continuing, rather than guessing at what "good" looks like.

@@ -23,7 +23,7 @@ layout: "pricing"
             ],
             "button": {
                 "text": "Start Free Trial",
-                "url": "/signup?plan=starter"
+                "url": "http://192.168.30.22:3000/signup?plan=starter"
             }
         },
         {
@@ -41,7 +41,7 @@ layout: "pricing"
             ],
             "button": {
                 "text": "Start Free Trial",
-                "url": "/signup?plan=growth"
+                "url": "http://192.168.30.22:3000/signup?plan=growth"
             }
         },
         {

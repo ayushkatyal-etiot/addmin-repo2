@@ -1,0 +1,72 @@
+name: addmin
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: addmin-db
+    environment:
+      POSTGRES_USER: addmin
+      POSTGRES_PASSWORD: addmin
+      POSTGRES_DB: addmin_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U addmin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: addmin-api
+    environment:
+      DATABASE_URL: postgresql://addmin:addmin@postgres:5432/addmin_dev
+      API_PORT: 3001
+      NODE_ENV: development
+      SESSION_SECRET: dev-secret-change-in-production
+      WEB_APP_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/src
+      - ./packages/db/src:/packages/db/src
+      - ./packages/db/prisma:/packages/db/prisma
+    command: sh -c "cd /app && pnpm --filter @addmin/db build && pnpm --filter @addmin/db migrate:deploy && pnpm --filter @addmin/api dev"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: addmin-web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web/app:/app/app
+    command: pnpm --filter @addmin/web dev
+
+  site:
+    build:
+      context: .
+      dockerfile: addmin-site/Dockerfile
+    container_name: addmin-site
+    ports:
+      - "1313:1313"
+    volumes:
+      - ./addmin-site/content:/app/content
+      - ./addmin-site/layouts:/app/layouts
+      - ./addmin-site/assets:/app/assets
+      - ./addmin-site/static:/app/static
+
+volumes:
+  postgres_data:

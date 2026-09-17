@@ -16,19 +16,19 @@ The marketing site in `../addmin-site/` is already live and self-serve-first: it
 | 2 | [02-research.md](./02-research.md) | Competitors · problem clusters · market gaps · insights · strategic direction |
 | 3 | [03-analysis.md](./03-analysis.md) | Executive summary · PMF score (64/100) · SWOT · TAM/SAM/SOM · Porter's 5F · BMC · positioning · risk matrix · GTM strategy |
 | 4 | [04-architecture.md](./04-architecture.md) | Containers · services · data models · API surface · background jobs · external integrations · tech stack |
-| 5 | [05-features.md](./05-features.md) | 19 P0 feature specs, including trial/subscription (F-19) (purpose, user flow, acceptance criteria, edge cases, telemetry) + P1 backlog |
+| 5 | [05-features.md](./05-features.md) | 20 P0 feature specs, including trial/subscription (F-19) and the Platform Operator console (F-20) (purpose, user flow, acceptance criteria, edge cases, telemetry) + P1 backlog |
 | 6 | [06-frontend.md](./06-frontend.md) | Routes · page specs · wireframes · component tree · design system · responsive grid |
 | 7 | [07-phases.md](./07-phases.md) | Foundation → MVP → Design-partner pilot → Hardening/launch → Scale · risk register · decision log · initiatives |
-| 8 | [08-build-playbook.md](./08-build-playbook.md) | Decision-grade build playbook — 13 dependency-ordered steps, each with goal · inputs · outputs · acceptance rubric · edge cases · pitfalls · quality bar · stop-and-review gate. Leaf to root. |
+| 8 | [08-build-playbook.md](./08-build-playbook.md) | Decision-grade build playbook — 14 dependency-ordered steps, each with goal · inputs · outputs · acceptance rubric · edge cases · pitfalls · quality bar · stop-and-review gate. Leaf to root. |
 
 ## How to use
 
 1. Read **01-idea.md** first. If anything's wrong, fix it there — every later stage builds on it.
-2. Skim **02-research.md** and **03-analysis.md** to understand the strategic context — in particular, the recommendation to freeze scope to the P0 slice and defer Epic 0's multi-tenant Group/Platform-Operator layer, Payment Execution Mode, and the remaining 7 OAMS modules until paying customers pull them.
+2. Skim **02-research.md** and **03-analysis.md** to understand the strategic context — in particular, the recommendation to freeze scope to the P0 slice and defer Epic 0's full Group multi-org tenancy, Payment Execution Mode, and the remaining 7 OAMS modules until paying customers pull them. A lightweight, AddMin-internal Platform Operator console (F-20) *is* in scope — see the distinction explained in `03-analysis.md`.
 3. Use **04-architecture.md** as your engineering north star.
-4. Implement features from **05-features.md** in priority order (all 19 are P0 for this release; the backlog section lists what's explicitly deferred).
+4. Implement features from **05-features.md** in priority order (all 20 are P0 for this release; the backlog section lists what's explicitly deferred).
 5. **Open 08-build-playbook.md.** Start with Build Step 01. Every step has an acceptance rubric — do not advance until every checkbox passes. Treat it as a senior engineer's runbook, not a wishlist.
-6. Use **07-phases.md** to set sprint goals and avoid scope creep — it maps directly to the 13 build-playbook steps.
+6. Use **07-phases.md** to set sprint goals and avoid scope creep — it maps directly to the 14 build-playbook steps.
 
 ## Want more?
 
@@ -60,13 +60,14 @@ Generated 2026-09-16 · PlanMySaaS Skill v1
   "gtm_motion": "self-serve free trial (primary) + sales-assisted Enterprise/design-partner pilot (secondary)",
   "price_range_inr_monthly": "15000-40000",
   "target_audience": "Admin/Facilities heads at 3-50 office mid-market companies",
-  "p0_feature_count": 19,
+  "p0_feature_count": 20,
   "p1_backlog_count": 9,
   "estimated_mvp_weeks": 12,
   "estimated_v1_weeks": 20,
   "estimated_team_size": 3,
   "marketing_site": "../addmin-site/ (Hugo, hugo-saasify-theme) — primary CTA is 'Start Free Trial' -> /signup",
   "signup_funnel_order": ["register (F-01)", "onboard (F-04, F-05)", "subscribe (F-19)"],
+  "internal_platform_ops_console": "F-20 — AddMin-internal only, cross-org view of Organization/Subscription with manual activate/suspend; not customer-facing; see build Step 06",
   "source_docs": [
     "AddMin_Refined_PRD_16.09.2026.docx",
     "AddMin_mod1_Utility_Management_BRD1_v2.0_01_08_26 v2.docx",
@@ -74,7 +75,7 @@ Generated 2026-09-16 · PlanMySaaS Skill v1
     "OAMS_Epic_0_Platform_Foundation_Final_v1.1.docx"
   ],
   "deferred_scope": [
-    "Epic 0 Group/Platform-Operator multi-tenancy",
+    "Epic 0 full Group multi-tenancy (customer-side multi-org hierarchy, Group Super Admin, generalized Membership/permission-catalogue — distinct from the in-scope lightweight Platform Operator console, F-20)",
     "Payment Gateway Execution Mode + AutoPay (customer-facing, distinct from F-19's SaaS billing)",
     "AI-assisted lease agreement drafting",
     "Broker/commission tracking",
