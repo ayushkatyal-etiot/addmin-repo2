@@ -9,6 +9,10 @@ jobs:
   lint-typecheck-build:
     runs-on: ubuntu-latest
 
+    env:
+      # Dummy DATABASE_URL for prisma generate schema validation (no actual DB needed)
+      DATABASE_URL: postgresql://user:password@localhost:5432/dummy
+
     steps:
       - uses: actions/checkout@v4
 
