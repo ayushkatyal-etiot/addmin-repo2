@@ -12,6 +12,12 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     environment: staging
+
+    env:
+      # Prisma validate requires a nonempty DATABASE_URL for generate/build.
+      # migrate deploy uses STAGING_DATABASE_URL when that secret is configured.
+      DATABASE_URL: postgresql://user:password@localhost:5432/dummy
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,18 +36,19 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm --filter @addmin/db run generate
-        env:
-          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
       - name: Build
         run: pnpm run build
-        env:
-          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
       - name: Apply pending migrations
-        run: pnpm --filter @addmin/db exec prisma migrate deploy
         env:
-          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          if [ -z "${STAGING_DATABASE_URL}" ]; then
+            echo "::warning::STAGING_DATABASE_URL is not configured; skipping prisma migrate deploy until staging database exists."
+            exit 0
+          fi
+          DATABASE_URL="${STAGING_DATABASE_URL}" pnpm --filter @addmin/db exec prisma migrate deploy
 
       # Deploy step is provider-specific (AWS or Render, per 04-architecture.md).
       # Fill in the actual deploy action/CLI call once a staging hosting
