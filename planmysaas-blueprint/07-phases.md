@@ -1,13 +1,13 @@
 # Phases + release plan — AddMin
 
 ## Total scope summary
-- Total features: 19 (P0) + 9 backlog (P1, deferred)
-- Total services: 18 modules/services + 3 stores + 4 external integrations
+- Total features: 20 (P0) + 9 backlog (P1, deferred)
+- Total services: 19 modules/services + 3 stores + 4 external integrations
 - Estimated MVP timeline: 12 weeks
 - Estimated v1.0 timeline: 20 weeks
 - Estimated team: 3 engineers (1 backend-lead, 1 full-stack, 1 frontend) + 1 part-time PM/founder doing design-partner validation
 
-This is a B2B compliance-adjacent product with server-enforced authorization and financial workflow at its core — the honest estimate below assumes a small team building carefully, not a solo weekend build. Effort estimates from `05-features.md` sum to ~84 person-days of feature work alone; the phases below add foundation, integration, and hardening time on top of that, which is where most B2B tools actually lose time.
+This is a B2B compliance-adjacent product with server-enforced authorization and financial workflow at its core — the honest estimate below assumes a small team building carefully, not a solo weekend build. Effort estimates from `05-features.md` sum to ~87 person-days of feature work alone; the phases below add foundation, integration, and hardening time on top of that, which is where most B2B tools actually lose time.
 
 The marketing site (`addmin-site/`) is already built and self-serve-first — its "Start Free Trial" CTA sends every visitor into `/signup` → onboarding → `/app/subscribe`, not into a sales queue. That means Billing & Subscription (F-19) can no longer wait until a later phase the way a sales-led plan would have allowed; it moves into Phase 1 below, because the marketing site's core promise is broken without it, even before any other module ships.
 
@@ -33,6 +33,7 @@ Goal: prove the core promise end-to-end for one office — a real Admin can onbo
 - F-03 (Organization & Office Hierarchy)
 - F-04, F-05 (Guided Onboarding Checklist + Setup Completion %)
 - F-19 (Free Trial Signup & Subscription Activation) — required because the marketing site's CTA and pricing-page plan buttons already point at this flow
+- F-20 (Platform Operator Console) — small (3 days) but a hard dependency of F-19's sales-assisted Enterprise/design-partner path; without it, nobody on the team can actually activate that alternate flow when the first sales-assisted deal closes
 - F-06 (Utility Connection Setup)
 - F-07, F-08 (Recurring Obligation Engine + Missing Bill Alert)
 - F-09, F-10 (Bill Entry + Approval Workflow)
@@ -40,7 +41,7 @@ Goal: prove the core promise end-to-end for one office — a real Admin can onbo
 
 **Tasks broken down:**
 - Week 3: Office hierarchy + onboarding checklist backend (OfficeChecklistTemplate/Item) and wizard frontend shell
-- Week 4: Trial/subscription backend (F-19: `Subscription` state machine, billing-provider adapter) + `/app/subscribe` frontend, wired to the onboarding wizard's exit; utility connection setup starts in parallel
+- Week 4: Trial/subscription backend (F-19: `Subscription` state machine, billing-provider adapter) + `/app/subscribe` frontend, wired to the onboarding wizard's exit; the Platform Ops Console (F-20: org list + manual subscription/tenant-status control) ships alongside it since it shares the `Subscription` entity; utility connection setup starts in parallel
 - Week 5: Recurring Obligation Engine (schedule + instance generation, nightly job) + Missing Bill Alert job + Bill entry/invoice upload + Bill register frontend
 - Week 6: Approval workflow (Maker-Checker routing, authorization limits) + Payment Tracking Mode
 - Week 7: Office Home dashboard (minimal version), internal QA against the full signup-to-payment flow, bug fixing
@@ -49,6 +50,7 @@ Goal: prove the core promise end-to-end for one office — a real Admin can onbo
 - A test user can click "Start Free Trial" on the actual marketing site, land in `/signup`, complete guided onboarding for a real office, and reach `/app/subscribe` without support intervention.
 - At least one full obligation cycle (utility bill: expected → entered → approved → paid → closed) completes end-to-end with correct audit trail.
 - At least one test subscription completes trial → paid conversion through the real billing-provider integration (not a stub), verified against the provider's own dashboard.
+- A Platform Operator can log into `/platform`, see that test org in the list, and manually set a second test org's Subscription to "active" and back to "trialing" — with no customer-scoped session able to reach `/platform` at all.
 - 0 P0 bugs in the signup-to-payment path.
 - Unauthorized cross-office access attempts are rejected and logged in 100% of a scripted test suite.
 
@@ -105,7 +107,7 @@ Goal: grow within the validated wedge before touching anything on the deferred b
 - SSO integration for the first enterprise-track customer that requires it
 - Late-payment fine rules, if design partners request it
 
-**Explicitly not started in this phase:** Group/Platform-Operator multi-tenancy (Epic 0's full tenancy spine), custom role builder UI, AI-assisted lease drafting, broker/commission tracking, additional OAMS modules (Meeting Room, Pantry, Visitor, Fleet, Procurement, Transport) — see `03-analysis.md`'s "avoid" recommendation.
+**Explicitly not started in this phase:** Epic 0's full Group multi-tenancy (customer-side multi-org hierarchy, Group Super Admin, Membership abstraction, custom role builder UI), AI-assisted lease drafting, broker/commission tracking, additional OAMS modules (Meeting Room, Pantry, Visitor, Fleet, Procurement, Transport) — see `03-analysis.md`'s "avoid" recommendation. (The lightweight Platform Operator console, F-20, already shipped in Phase 1 — it is not part of this deferred list.)
 
 ## Risk register (from stage 3)
 
@@ -122,10 +124,11 @@ Goal: grow within the validated wedge before touching anything on the deferred b
 
 1. **Chose a modular monolith (NestJS) over microservices** — team size (3 engineers) doesn't justify microservice operational overhead; module boundaries in `04-architecture.md` keep a clean path to splitting out services later if needed.
 2. **Chose Postgres + Prisma over a NoSQL store** — financial/audit data (bills, payments, TDS, audit logs) needs ACID guarantees and relational integrity across Office/Utility/Payment/Audit entities.
-3. **Deferred the Epic 0 multi-tenant Group/Platform-Operator layer** — no validated customer need yet for multi-organization tenancy; single-org tenancy with an `org_id` reserved on every table keeps the door open without paying the complexity cost now.
+3. **Deferred Epic 0's full multi-tenant Group layer** — no validated customer need yet for multi-organization tenancy; single-org tenancy with an `org_id` reserved on every table keeps the door open without paying the complexity cost now. (The much smaller, AddMin-internal Platform Operator console is a separate decision — see 7 below.)
 4. **Deferred Payment Gateway/Execution Mode to Phase 4** — avoids taking on PCI-DSS scope and a commercial gateway relationship before Payment Tracking Mode alone has been validated with paying customers. This is separate from decision 6 below.
 5. **Web-first, no mobile app in Phase 0-3** — Facility Staff field actions (photo/video evidence, maintenance updates) work adequately on mobile web in the pilot phase; a native/offline app is only justified once volume of field usage is proven.
 6. **Brought AddMin's own SaaS billing (F-19, Stripe/Razorpay Subscriptions) into Phase 1, not deferred like the P1 payment gateway above** — the marketing site was already built self-serve, with "Start Free Trial" as the primary CTA across the homepage, header, and pricing page; shipping Phase 1 without a working trial-to-subscribe flow would mean the live marketing site makes a promise the product can't keep.
+7. **Scoped in a lightweight Platform Operator console (F-20) alongside F-19, but explicitly did not build Epic 0's full Group tenancy** — AddMin's own team needs a way to view all orgs and manually flip a subscription/tenant status the moment the first sales-assisted deal closes (F-19's alternate path already assumed this existed); a single internal role with cross-org read/write on two fields solves that completely, without the Membership abstraction, permission catalogue, or break-glass consent flow that a customer-facing multi-org Group hierarchy would require. Revisit Group tenancy only per `03-analysis.md`'s expansion discipline (≥10 paying orgs, ≥2 explicitly asking for it).
 
 ## Initiatives (cross-cutting)
 

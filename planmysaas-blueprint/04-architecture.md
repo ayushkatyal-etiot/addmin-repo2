@@ -1,6 +1,6 @@
 # System architecture — AddMin
 
-Scoped to the P0 release (Onboarding, Billing & Subscription, Utility Management, Property/Lease, Facilities/Maintenance, Assets, Vendors, Compliance, Workflow/RBAC, Reports) for a single-organization tenant model. The Epic 0 multi-level Group/Platform-Operator tenancy is deliberately deferred per `03-analysis.md` — the data model below reserves an `org_id` on every table so that layer can be added later without a schema rewrite, but no Group/Platform tables are built now.
+Scoped to the P0 release (Onboarding, Billing & Subscription, Utility Management, Property/Lease, Facilities/Maintenance, Assets, Vendors, Compliance, Workflow/RBAC, Reports) for a single-organization tenant model. The Epic 0 multi-level Group tenancy (customer-side multi-org hierarchy, Group Super Admin, Membership abstraction) is deliberately deferred per `03-analysis.md` — the data model below reserves an `org_id` on every table so that layer can be added later without a schema rewrite. A separate, much smaller piece of Epic 0 — a lightweight, AddMin-internal Platform Operator console — *is* in scope; see the Platform Operations Module and `PlatformOperator` entity below.
 
 ## Containers (top-level)
 
@@ -8,7 +8,7 @@ Scoped to the P0 release (Onboarding, Billing & Subscription, Utility Management
 - **API Backend** — REST API enforcing RBAC/office-scope/segregation-of-duties server-side, owns all business logic and the Recurring Obligation Engine. Tech: Node.js (NestJS) + Prisma. External integrations: email provider, SMS provider (optional), object storage, payment gateway (P1 only).
 - **Worker Service** — Background job runner for obligation-instance generation, reminders/escalations, and report aggregation. Tech: BullMQ + Redis. External integrations: email/SMS provider.
 - **Mobile App (P1)** — Field app for Facility Staff (maintenance tasks, photo/video evidence, offline capture). Tech: React Native. External integrations: API Backend only, with offline sync queue.
-- **Admin/Ops Console** — Thin internal tool for platform-level support (impersonation with consent, seed-data management) — minimal in P0, expands only if a support burden appears.
+- **Platform Ops Console** — Internal-only web app for AddMin's own team (Platform Operators): list every customer Organization, view its Subscription/tenant status, and manually activate/suspend one (F-20). Not reachable by any customer role, not linked from the customer Web App. Tech: same Next.js 14 app as the Web App, mounted at a separate `/platform` route tree with its own login. External integrations: none directly — calls the API layer's `/internal/*` endpoints.
 
 ## Services (10-25 microservices or modules)
 
@@ -18,6 +18,7 @@ Modules within the single API Backend (modular monolith, not microservices, per 
 - **Organization & Office Module** — service — Manages org/office/building/floor hierarchy and office scope. Owns: Organization, Office, Building, Floor. Talks to: Identity & Access Module, Onboarding Module.
 - **Onboarding Module** — service — Drives the guided setup checklist and setup-completion %. Owns: OfficeSetupProfile, OfficeChecklistTemplate, OfficeChecklistItem. Talks to: Organization & Office Module, Utility Module, Facility Module, Compliance Module.
 - **Billing & Subscription Module** — service — AddMin's own SaaS billing: trial lifecycle, plan selection, and subscription status that gates continued access after trial expiry. Owns: Subscription, Plan, BillingEvent. Talks to: Identity & Access Module (post-signup trial start), Notification Module (trial reminders), external Billing Provider. Deliberately separate from the Payment Module below — this is revenue AddMin collects from the customer organization, never to be confused with the customer's own vendor/rent payments.
+- **Platform Operations Module** — service — Internal-only, cross-org module behind the Platform Ops Console (F-20): lists every Organization, reads/writes `Organization.tenant_status` and `Subscription.status`/`plan` directly, for AddMin's own team. Owns no new primary data — reads Organization/Subscription across every tenant (the one deliberate exception to every other module's org-scoping) and writes only those two fields. Talks to: Organization & Office Module, Billing & Subscription Module, Audit Module (every action here is audited, since it is the one place in the system that intentionally crosses org boundaries). Explicitly does not implement Epic 0's Group hierarchy, Membership abstraction, permission catalogue, or break-glass consent flow — a single internal role is sufficient at this scope, per `03-analysis.md`.
 - **Utility Module** — service — Utility master, connections, recurring bill obligations. Owns: UtilityType, UtilityAccount, UtilityBill. Talks to: Obligation Engine, Workflow Module, Vendor Module.
 - **Property & Lease Module** — service — Landlord, lease, rent schedule, CAM, TDS on rent. Owns: Landlord, Lease, RentSchedule, CAMCharge. Talks to: Obligation Engine, Workflow Module.
 - **Obligation Engine** — service — Central recurring-obligation and expected-instance generator shared by Utility, Lease, AMC and Compliance. Owns: RecurringObligationSchedule, ObligationInstance. Talks to: Utility Module, Property & Lease Module, Vendor Module, Compliance Module, Notification Module.
@@ -39,7 +40,7 @@ Modules within the single API Backend (modular monolith, not microservices, per 
 - **Payment Gateway (P1)** — external — Net banking/UPI/card/wallet execution, only active in Payment Execution Mode. Pays the *customer's* utility providers/landlords — distinct from the item below.
 - **Billing Provider (P0, e.g. Stripe/Razorpay Subscriptions)** — external — Charges the *customer organization* for using AddMin per its chosen plan; powers the trial-to-paid conversion described in `05-features.md`'s F-19. Live from the first release since the marketing site's "Start Free Trial" CTA depends on it, unlike the P1 Payment Gateway above.
 
-**Node count by type:** Modules/Services: 18, Stores: 3, External: 4.
+**Node count by type:** Modules/Services: 19, Stores: 3, External: 4.
 
 ## Data models (8-15 core entities)
 
@@ -50,10 +51,20 @@ Organization
   gstin             string  NULLABLE
   default_currency  string
   timezone          string
+  tenant_status     enum(active, suspended)  DEFAULT active
   created_at        timestamp
   → has one Subscription
   → has many Office
   → has many Vendor
+
+PlatformOperator
+  id                string  PK
+  email             string  UNIQUE
+  mfa_enabled       boolean
+  created_at        timestamp
+  (deliberately not a row in the customer `User` table and carries no `org_id` —
+   an AddMin staff identity, authenticated on a separate /platform login,
+   never a Membership of any customer Organization)
 
 Subscription
   id                string  PK
@@ -267,6 +278,9 @@ POST   /api/offices/:id/activate               Activate office (post setup revie
 GET    /api/billing/subscription                Get org's current trial/plan status     yes
 POST   /api/billing/subscribe                   Select plan + confirm payment method     yes
 POST   /api/billing/webhook                     Billing provider callback (server-only) no
+GET    /internal/organizations                  List all orgs + status (PO-only)        yes (PO)
+PATCH  /internal/organizations/:id/tenant-status Suspend/reactivate a tenant (PO-only)   yes (PO)
+PATCH  /internal/organizations/:id/subscription  Manually set plan/status (PO-only)      yes (PO)
 POST   /api/utility-accounts                   Create utility connection                yes
 GET    /api/utility-accounts/:officeId         List utility connections for office     yes
 POST   /api/utility-bills                      Create/draft a utility bill              yes
@@ -345,4 +359,9 @@ Identity & Access Module --(sync, on signup)--> Billing & Subscription Module
 Billing & Subscription Module --(sync)--> Billing Provider
 Billing Provider --(async webhook)--> Billing & Subscription Module
 Worker Service --(cron: trial reminders + expiry)--> Billing & Subscription Module
+
+Platform Ops Console --(HTTPS, sync, separate login)--> API Backend (/internal/* routes only)
+Platform Operations Module --(sync, in-process, cross-org read/write)--> Organization & Office Module
+Platform Operations Module --(sync, in-process, cross-org read/write)--> Billing & Subscription Module
+Platform Operations Module --(sync, in-process)--> Audit Module
 ```

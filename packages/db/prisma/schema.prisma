@@ -29,13 +29,18 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Organization {
-  id              String   @id @default(cuid())
-  name            String
-  gstin           String?
-  defaultCurrency String   @default("INR") @map("default_currency")
-  timezone        String   @default("Asia/Kolkata")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(cuid())
+  name                String
+  gstin               String?
+  defaultCurrency     String   @default("INR") @map("default_currency")
+  timezone            String   @default("Asia/Kolkata")
+  // Segregation-of-duties override: when true, a Maker may approve their own
+  // record (e.g. a bill they created). Default is the stricter blocked state
+  // per Step 03's guard rule; the approve endpoints that consume this are
+  // built in Step 07/08.
+  sodOverrideEnabled  Boolean  @default(false) @map("sod_override_enabled")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   offices  Office[]
   vendors  Vendor[]
@@ -572,14 +577,19 @@ enum UserRole {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  orgId       String   @map("org_id")
-  email       String   @unique
-  role        UserRole
-  officeScope Json     @default("[]") @map("office_scope")
-  mfaEnabled  Boolean  @default(false) @map("mfa_enabled")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id              String    @id @default(cuid())
+  orgId           String    @map("org_id")
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  role            UserRole
+  officeScope     Json      @default("[]") @map("office_scope")
+  mfaEnabled      Boolean   @default(false) @map("mfa_enabled")
+  // AES-256-GCM encrypted TOTP seed, never stored in plaintext. Null until
+  // MFA enrollment completes.
+  mfaSecret       String?   @map("mfa_secret")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   organization             Organization                   @relation(fields: [orgId], references: [id])
   activatedOfficeSetups    OfficeSetupProfile[]            @relation("OfficeActivatedBy")
@@ -587,9 +597,47 @@ model User {
   ownedSchedules           RecurringObligationSchedule[]   @relation("ScheduleOwner")
   authorizedPayments       Payment[]                       @relation("PaymentAuthorizedBy")
   auditLogs                AuditLog[]
+  sessions                 Session[]
+  authTokens               AuthToken[]
 
   @@index([orgId])
   @@map("users")
+}
+
+// Server-side sessions (Step 03): revoking one is instant, unlike a stateless
+// JWT whose claims would otherwise live until expiry.
+model Session {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+enum AuthTokenType {
+  email_verification
+  password_reset
+}
+
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String        @map("user_id")
+  type      AuthTokenType
+  tokenHash String        @map("token_hash")
+  expiresAt DateTime      @map("expires_at")
+  usedAt    DateTime?     @map("used_at")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, type])
+  @@map("auth_tokens")
 }
 
 model AuditLog {

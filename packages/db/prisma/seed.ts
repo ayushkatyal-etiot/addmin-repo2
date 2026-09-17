@@ -1,6 +1,11 @@
 import { PrismaClient, UserRole } from "@prisma/client";
+import { hashPassword } from "../src/password";
 
 const prisma = new PrismaClient();
+
+// Every seeded test user shares this password (never used outside local/CI
+// seed data — real signups always set their own).
+const SEED_PASSWORD = "Password123!";
 
 const ALL_ROLES: UserRole[] = [
   "platform_admin",
@@ -15,6 +20,8 @@ const ALL_ROLES: UserRole[] = [
 ];
 
 async function main() {
+  const passwordHash = await hashPassword(SEED_PASSWORD);
+
   const org = await prisma.organization.create({
     data: {
       name: "Acme Test Organization",
@@ -40,6 +47,7 @@ async function main() {
         data: {
           orgId: org.id,
           email: `${role}@acme-test.example.com`,
+          passwordHash,
           role,
           officeScope: [office.id],
           mfaEnabled: false,

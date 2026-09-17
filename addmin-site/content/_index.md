@@ -6,7 +6,7 @@ title: Home
     headline="Never find out a bill is overdue when the vendor calls to <span class='text-primary-600'>disconnect you</span>."
     sub_headline="AddMin is the office administration operating system that tells admin teams what to manage — utilities, leases, compliance, vendor AMCs, and assets — instead of waiting for them to remember."
     primary_button_text="Start Free Trial"
-    primary_button_url="/signup"
+    primary_button_url="http://192.168.30.22:3000/signup"
     secondary_button_text="See Pricing"
     secondary_button_url="/pricing"
     hero_image="/images/hero-dashboard.svg"

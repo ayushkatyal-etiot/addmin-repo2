@@ -1,8 +1,8 @@
 # Feature specifications — AddMin
 
 ## Summary
-- Total features: 19
-- Modules covered: 12 (Identity & Access, Organization & Office, Onboarding, Billing & Subscription, Utility, Property & Lease, Obligation Engine, Workflow & Approval, Payment, Facility & Maintenance, Asset, Vendor, Compliance, Reporting — grouped into 19 specs)
+- Total features: 20
+- Modules covered: 15 (Identity & Access, Organization & Office, Onboarding, Billing & Subscription, Platform Operations, Utility, Property & Lease, Obligation Engine, Workflow & Approval, Payment, Facility & Maintenance, Asset, Vendor, Compliance, Reporting — grouped into 20 specs)
 - Coverage: 100% of P0 modules have at least 1 feature spec
 
 The marketing site (`addmin-site/`) now routes its primary CTA — "Start Free Trial" — directly into this product's funnel: F-01 (register) → F-04/F-05 (onboard) → F-19 (subscribe). "Book a Demo" is retained only as a secondary, sales-assisted path for the Enterprise plan and design-partner pilots, per `addmin-site/content/contact.md`.
@@ -30,8 +30,9 @@ The marketing site (`addmin-site/`) now routes its primary CTA — "Start Free T
 | F-16  | Asset                     | Asset Register & Employee Asset Request         | P0       | 5 days |
 | F-17  | Compliance                | Compliance Checklist & Expiry Tracking          | P0       | 4 days |
 | F-18  | Reporting                 | Office Home, My Actions & Executive Dashboard   | P0       | 7 days |
+| F-20  | Platform Operations       | Platform Operator Console (Tenant & Subscription Oversight) | P0 | 3 days |
 
-Backlog (P1, deferred per `03-analysis.md`): Payment Gateway Execution Mode + AutoPay, Late-Payment Fine Rules, AI-Assisted Lease Agreement Drafting, Broker/Commission Tracking, Property Handover/Takeover Condition Capture, Mobile Offline Sync, SSO Integration, Custom Role Builder UI, Group/Platform-Operator Multi-Tenancy.
+Backlog (P1, deferred per `03-analysis.md`): Payment Gateway Execution Mode + AutoPay, Late-Payment Fine Rules, AI-Assisted Lease Agreement Drafting, Broker/Commission Tracking, Property Handover/Takeover Condition Capture, Mobile Offline Sync, SSO Integration, Custom Role Builder UI, Group Multi-Tenancy (customer-side multi-org hierarchy, Group Super Admin, generalized Membership/permission-catalogue — see `03-analysis.md`, distinct from the lightweight internal Platform Operator console at F-20, which is in scope).
 
 ## Feature specs (12-20 features)
 
@@ -251,7 +252,7 @@ Makes the marketing site's "Start Free Trial" CTA (`addmin-site/hugo.toml`, `con
 6. Subscription transitions from "trialing" to "active"; billing begins per the confirmed plan
 7. Alternate: user ignores the prompt and keeps using the trial — a reminder notification fires at 3 days and 1 day before trial expiry
 8. Alternate: trial expires with no plan chosen — org's access is gated to a "choose a plan to continue" screen until subscribed
-9. Alternate: an Enterprise prospect comes through the sales-assisted "Contact Sales" path (addmin-site/content/contact.md) instead — Platform Administrator sets their Subscription directly to "active" with a negotiated plan, bypassing the trial state entirely
+9. Alternate: an Enterprise prospect comes through the sales-assisted "Contact Sales" path (addmin-site/content/contact.md) instead — a Platform Operator (AddMin-internal, via the Platform Ops Console, F-20 — not the org-scoped "Platform Administrator" customer role) sets their Subscription directly to "active" with a negotiated plan, bypassing the trial state entirely
 ```
 
 #### Acceptance criteria
@@ -261,7 +262,7 @@ Makes the marketing site's "Start Free Trial" CTA (`addmin-site/hugo.toml`, `con
 - [ ] Submitting valid payment details transitions Subscription status to "active" within 5 seconds and is confirmed against the billing provider's authoritative webhook/callback, not just client-side confirmation.
 - [ ] Reminder notifications fire at 3 days and 1 day before trial expiry.
 - [ ] An org whose trial expires with no plan chosen is gated to a "choose a plan to continue" state; every other role/office authorization rule (F-02) still applies independently on top of this gate.
-- [ ] A sales-assisted Enterprise or design-partner org can be set to "active" directly by a Platform Administrator without ever entering "trialing" status.
+- [ ] A sales-assisted Enterprise or design-partner org can be set to "active" directly by a Platform Operator (F-20) without ever entering "trialing" status.
 - [ ] Every subscription status transition is recorded in the audit trail (F-02's Audit Module).
 
 #### Edge cases
@@ -761,3 +762,43 @@ Delivers the "single view of what's due, overdue, expiring" retention feature fr
 
 #### Telemetry events
 `office_home_viewed`, `my_actions_item_opened`, `executive_dashboard_filtered`, `dashboard_drilldown_clicked`, `report_exported`
+
+---
+
+### F-20 · Platform Operator Console (Tenant & Subscription Oversight)
+
+**Module:** Platform Operations
+**Primary actor:** Platform Operator (AddMin-internal staff, not a customer role) · **Secondary:** none — this feature is never exposed to any customer
+**Priority:** P0 · **Effort:** 3 days
+
+#### Purpose
+Gives AddMin's own team the one cross-org capability the product actually needs from day one: see every customer Organization and manually activate or suspend its Subscription/tenant status. This resolves a real gap already latent in F-19 — its sales-assisted Enterprise path assumed *someone* could set a Subscription to "active" outside the self-serve flow, but no such role existed. This is deliberately the lightweight version — no Epic 0 Group hierarchy, Membership abstraction, permission catalogue, or break-glass consent flow (see `03-analysis.md`'s scoping note); it is a single internal role with cross-org read/write on exactly two fields.
+
+#### User flow
+```
+1. Platform Operator logs into /platform (a separate login from the customer Web App, backed by the standalone PlatformOperator identity, not the customer User table)
+2. Platform Operator sees a list of every Organization: name, plan, subscription status, tenant status, trial_ends_at
+3. Platform Operator searches/filters the list (e.g., by subscription status = "trialing" and trial_ends_at within 3 days)
+4. Platform Operator opens a specific org, sees its full Subscription detail
+5. For a sales-assisted Enterprise/design-partner deal (F-19's alternate path), Platform Operator sets plan + status = "active" directly, skipping the trial
+6. Alternate: Platform Operator suspends an org's tenant_status (e.g., non-payment, abuse, or an explicit customer offboarding request) — every API call for that org's users is subsequently blocked
+7. Alternate: Platform Operator reactivates a previously suspended org — access resumes immediately
+8. Every action taken here is written to the Audit Module, tagged with the acting Platform Operator's identity
+```
+
+#### Acceptance criteria
+- [ ] `/platform` is unreachable by any customer-scoped session — a customer User (of any role) attempting to access it is rejected, verified with a direct test using a valid customer session token.
+- [ ] The org list shows every Organization on the platform with its current plan, Subscription status, and tenant_status, with search/filter by at least name and Subscription status.
+- [ ] Setting a Subscription to "active" with a chosen plan from the console works identically to F-19's self-serve path from the customer's perspective — their next login sees an active subscription, no special-casing visible to them.
+- [ ] Suspending an org's tenant_status immediately blocks every subsequent API call for that org's users, independent of and in addition to Step 03's `AuthzGuard` and F-19's `SubscriptionGuard` — a suspended org is blocked even if its Subscription is otherwise "active".
+- [ ] Reactivating a suspended org restores access on the org's very next API call, with no re-login required.
+- [ ] Every tenant-status or subscription change made through this console produces an AuditLog entry identifying the acting Platform Operator, distinct from any customer-side audit entry.
+- [ ] PlatformOperator accounts require MFA, consistent with the admin-MFA requirement elsewhere in the product.
+
+#### Edge cases
+- A Platform Operator suspends an org that has an in-progress trial — trial_ends_at and Subscription status are left untouched; suspension is a separate, orthogonal gate (tenant_status), not a Subscription state, so reactivating restores the org exactly where its trial/subscription state was.
+- Two Platform Operators edit the same org's status concurrently — the second write wins and is fully audited, but the console should show a warning if the record changed since it was loaded (optimistic concurrency check), not silently overwrite.
+- A suspended org's users attempt to log in — they see a clear "your organization's access has been suspended, contact support" message, not a generic error or a misleading authentication failure.
+
+#### Telemetry events
+`platform_org_viewed`, `platform_subscription_manually_set`, `platform_tenant_suspended`, `platform_tenant_reactivated`
